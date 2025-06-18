@@ -21,13 +21,15 @@ const userRoutes = require('./routes/userRoutes');
 const labRoutes = require('./routes/labRoutes');
 const fieldRoutes = require('./routes/fieldRoutes');
 const labFieldRoutes = require('./routes/labFieldRoutes');
+const itemRoutes = require('./routes/itemRoutes');
 
 app.use('/api/departments', departmentRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/labs', labRoutes);
-app.use('/api/fields', fiseldRoutes);
+app.use('/api/fields', fieldRoutes);
 app.use('/api/lab-fields', labFieldRoutes);
+app.use('/api/stock', itemRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
