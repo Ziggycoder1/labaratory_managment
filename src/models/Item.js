@@ -64,14 +64,14 @@ itemSchema.statics.findAll = async function({ lab_id, type, low_stock, expiring_
       }
     }
   ]);
-  return {
-    items,
-    pagination: {
-      current_page: parseInt(page),
-      total_pages: Math.ceil(totalCount / limit),
-      total_count: totalCount,
-      per_page: parseInt(limit)
-    },
+        return {
+            items,
+            pagination: {
+                current_page: parseInt(page),
+                total_pages: Math.ceil(totalCount / limit),
+                total_count: totalCount,
+                per_page: parseInt(limit)
+            },
     alerts: alerts || { low_stock_count: 0, expiring_soon_count: 0, expired_count: 0 }
   };
 };
@@ -88,7 +88,7 @@ itemSchema.statics.findByIdWithDetails = async function(id) {
 itemSchema.statics.createItem = async function(itemData) {
   const item = await this.create({
     ...itemData,
-    available_quantity: itemData.quantity
+            available_quantity: itemData.quantity
   });
   return item;
 };
@@ -104,9 +104,9 @@ itemSchema.statics.adjustStock = async function(id, adjustmentData) {
   try {
     const item = await this.findById(id).session(session);
     if (!item) throw new Error('Item not found');
-    const adjustment = adjustmentData.adjustment_type === 'add' 
-      ? adjustmentData.quantity 
-      : -adjustmentData.quantity;
+            const adjustment = adjustmentData.adjustment_type === 'add' 
+                ? adjustmentData.quantity 
+                : -adjustmentData.quantity;
     item.quantity += adjustment;
     item.available_quantity += adjustment;
     await item.save();

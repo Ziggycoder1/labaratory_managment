@@ -214,10 +214,114 @@ const getPermissionsByRole = (role) => {
   return permissions[role] || [];
 };
 
+// Register new user (only student and external roles allowed)
+const register = async (req, res) => {
+  const { name, email, password, role, department_id } = req.body;
+
+  try {
+    // Validate required fields
+    if (!name || !email || !password || !role || !department_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required: name, email, password, role, department_id',
+        errors: []
+      });
+    }
+
+    // Validate allowed roles - only student and external are allowed for registration
+    const allowedRoles = ['student', 'external'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Only "student" and "external" roles are allowed for registration',
+        errors: []
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format',
+        errors: []
+      });
+    }
+
+    // Validate password strength (minimum 6 characters)
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+        errors: []
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists',
+        errors: []
+      });
+    }
+
+    // Validate department exists
+    const department = await Department.findById(department_id);
+    if (!department) {
+      return res.status(400).json({
+        success: false,
+        message: 'Department not found',
+        errors: []
+      });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create new user
+    const user = new User({
+      full_name: name,
+      email,
+      password: hashedPassword,
+      role,
+      department: department_id,
+      is_active: true
+    });
+
+    await user.save();
+
+    // Populate department for response
+    await user.populate('department');
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        id: user._id,
+        email: user.email,
+        name: user.full_name,
+        role: user.role,
+        department_id: user.department._id
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error during registration',
+      errors: []
+    });
+  }
+};
+
 module.exports = {
   login,
   forgotPassword,
   resetPassword,
   logout,
-  getCurrentUser
+  getCurrentUser,
+  register
 }; 
