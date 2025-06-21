@@ -1,14 +1,16 @@
-const mysql = require('mysql2/promise');
+const mongoose = require('mongoose');
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'nozomi.proxy.rlwy.net',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'OeIwknUlpfVVdsqtyAbEFSGmUePmtarA',
-  database: process.env.DB_NAME || 'railway',
-  port: process.env.DB_PORT || 49783,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+const DB_URI = process.env.DB_URI || 'mongodb://localhost:27017/lab_managment';
+
+mongoose.connect(DB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
 });
 
-module.exports = pool; 
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+  console.log('Connected to MongoDB');
+});
+
+module.exports = db; 

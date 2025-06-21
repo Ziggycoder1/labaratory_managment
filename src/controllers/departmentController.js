@@ -1,19 +1,41 @@
-const pool = require('../config/database');
+const Department = require('../models/Department');
+const Lab = require('../models/Lab');
+const User = require('../models/User');
 
-// Get all departments
+// Get all departments with labs_count and users_count
 const getAllDepartments = async (req, res) => {
   try {
-    const [departments] = await pool.query(`
-      SELECT 
-        d.*,
-        COUNT(DISTINCT l.id) as labs_count,
-        COUNT(DISTINCT u.id) as users_count
-      FROM departments d
-      LEFT JOIN labs l ON d.id = l.department_id
-      LEFT JOIN users u ON d.id = u.department_id
-      GROUP BY d.id
-    `);
-
+    // Aggregate labs_count and users_count for each department
+    const departments = await Department.aggregate([
+      {
+        $lookup: {
+          from: 'labs',
+          localField: '_id',
+          foreignField: 'department',
+          as: 'labs'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: 'department',
+          as: 'users'
+        }
+      },
+      {
+        $addFields: {
+          labs_count: { $size: '$labs' },
+          users_count: { $size: '$users' }
+        }
+      },
+      {
+        $project: {
+          labs: 0,
+          users: 0
+        }
+      }
+    ]);
     res.json({
       success: true,
       data: departments
@@ -30,22 +52,12 @@ const getAllDepartments = async (req, res) => {
 // Create new department
 const createDepartment = async (req, res) => {
   const { name, code, description } = req.body;
-
   try {
-    const [result] = await pool.query(
-      'INSERT INTO departments (name, code, description) VALUES (?, ?, ?)',
-      [name, code, description]
-    );
-
-    const [newDepartment] = await pool.query(
-      'SELECT * FROM departments WHERE id = ?',
-      [result.insertId]
-    );
-
+    const department = await Department.create({ name, code, description });
     res.status(201).json({
       success: true,
       message: 'Department created successfully',
-      data: newDepartment[0]
+      data: department
     });
   } catch (error) {
     console.error('Error creating department:', error);

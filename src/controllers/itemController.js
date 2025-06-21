@@ -39,7 +39,7 @@ exports.getAllItems = async (req, res) => {
 // Get specific item details
 exports.getItemById = async (req, res) => {
     try {
-        const item = await Item.findById(req.params.id);
+        const item = await Item.findByIdWithDetails(req.params.id);
         
         if (!item) {
             return res.status(404).json({
@@ -73,7 +73,7 @@ exports.createItem = async (req, res) => {
             });
         }
 
-        const result = await Item.create(req.body);
+        const result = await Item.createItem(req.body);
         
         res.status(201).json({
             success: true,
@@ -101,7 +101,7 @@ exports.updateItem = async (req, res) => {
             });
         }
 
-        const success = await Item.update(req.params.id, req.body);
+        const success = await Item.updateItem(req.params.id, req.body);
         
         if (!success) {
             return res.status(404).json({
@@ -159,12 +159,68 @@ exports.adjustStock = async (req, res) => {
 exports.getAlerts = async (req, res) => {
     try {
         const { type, lab_id } = req.query;
-        
-        const result = await Item.getAlerts({ type, lab_id });
+        const filter = {};
+        if (lab_id) filter.lab = lab_id;
+        const now = new Date();
+        const soon = new Date();
+        soon.setDate(now.getDate() + 30);
+
+        let alertTypeFilter = {};
+        if (type === 'low_stock') {
+            alertTypeFilter = { $expr: { $lte: ["$available_quantity", "$minimum_quantity"] } };
+        } else if (type === 'expiring_soon') {
+            alertTypeFilter = {
+                expiry_date: { $ne: null, $lte: soon, $gte: now }
+            };
+        } else if (type === 'expired') {
+            alertTypeFilter = {
+                expiry_date: { $ne: null, $lt: now }
+            };
+        }
+        const items = await Item.find({ ...filter, ...alertTypeFilter })
+            .populate('lab', 'name')
+            .lean();
+
+        // Summary counts
+        const [summary] = await Item.aggregate([
+            { $match: filter },
+            {
+                $group: {
+                    _id: null,
+                    low_stock: {
+                        $sum: { $cond: [{ $lte: ["$available_quantity", "$minimum_quantity"] }, 1, 0] }
+                    },
+                    expiring_soon: {
+                        $sum: {
+                            $cond: [
+                                { $and: [
+                                    { $ne: ["$expiry_date", null] },
+                                    { $lte: ["$expiry_date", soon] },
+                                    { $gte: ["$expiry_date", now] }
+                                ] }, 1, 0
+                            ]
+                        }
+                    },
+                    expired: {
+                        $sum: {
+                            $cond: [
+                                { $and: [
+                                    { $ne: ["$expiry_date", null] },
+                                    { $lt: ["$expiry_date", now] }
+                                ] }, 1, 0
+                            ]
+                        }
+                    }
+                }
+            }
+        ]);
 
         res.json({
             success: true,
-            data: result
+            data: {
+                alerts: items,
+                summary: summary || { low_stock: 0, expiring_soon: 0, expired: 0 }
+            }
         });
     } catch (error) {
         console.error('Error fetching alerts:', error);
@@ -174,4 +230,6 @@ exports.getAlerts = async (req, res) => {
             error: error.message
         });
     }
-}; 
+};
+
+// Note: getAlerts method is not implemented in the new Item model. You may want to implement it if needed. 

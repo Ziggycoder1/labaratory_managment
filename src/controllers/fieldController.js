@@ -1,45 +1,35 @@
-const pool = require('../config/database');
+const Field = require('../models/Field');
+const Lab = require('../models/Lab');
 
 // Get all fields with their associated labs
 const getAllFields = async (req, res) => {
     try {
-        const query = `
-            SELECT 
-                f.*,
-                GROUP_CONCAT(DISTINCT l.id) as lab_ids,
-                GROUP_CONCAT(DISTINCT l.name) as lab_names,
-                GROUP_CONCAT(DISTINCT l.code) as lab_codes
-            FROM fields f
-            LEFT JOIN lab_fields lf ON f.id = lf.field_id
-            LEFT JOIN labs l ON lf.lab_id = l.id AND l.is_active = true
-            GROUP BY f.id
-            ORDER BY f.name
-        `;
-
-        const [fields] = await pool.query(query);
-
-        // Process the results to format lab information
-        const formattedFields = fields.map(field => ({
-            id: field.id,
-            name: field.name,
-            code: field.code,
-            description: field.description,
-            available_labs: field.lab_ids ? field.lab_ids.split(',').map((id, index) => ({
-                id: parseInt(id),
-                name: field.lab_names.split(',')[index],
-                code: field.lab_codes.split(',')[index]
-            })) : []
+        const fields = await Field.find().lean();
+        // Populate labs for each field using the virtual
+        const populatedFields = await Promise.all(fields.map(async field => {
+            const labs = await Lab.find({ fields: field._id }).select('name code').lean();
+            return {
+                id: field._id,
+                name: field.name,
+                code: field.code,
+                description: field.description,
+                available_labs: labs.map(lab => ({
+                    id: lab._id,
+                    name: lab.name,
+                    code: lab.code
+                }))
+            };
         }));
-
         res.json({
             success: true,
-            data: formattedFields
+            data: populatedFields
         });
     } catch (error) {
         console.error('Error in getAllFields:', error);
         res.status(500).json({
             success: false,
-            message: 'Error retrieving fields'
+            message: 'Error retrieving fields',
+            errors: [error.message]
         });
     }
 };
@@ -47,42 +37,26 @@ const getAllFields = async (req, res) => {
 // Create a new field
 const createField = async (req, res) => {
     const { name, code, description } = req.body;
-
     try {
-        // Check if field code already exists
-        const [existingField] = await pool.query(
-            'SELECT id FROM fields WHERE code = ?',
-            [code]
-        );
-
-        if (existingField.length > 0) {
+        const existingField = await Field.findOne({ code });
+        if (existingField) {
             return res.status(400).json({
                 success: false,
                 message: 'Field code already exists'
             });
         }
-
-        // Insert new field
-        const [result] = await pool.query(
-            'INSERT INTO fields (name, code, description) VALUES (?, ?, ?)',
-            [name, code, description]
-        );
-
+        const field = await Field.create({ name, code, description });
         res.status(201).json({
             success: true,
             message: 'Field created successfully',
-            data: {
-                id: result.insertId,
-                name,
-                code,
-                description
-            }
+            data: field
         });
     } catch (error) {
         console.error('Error in createField:', error);
         res.status(500).json({
             success: false,
-            message: 'Error creating field'
+            message: 'Error creating field',
+            errors: [error.message]
         });
     }
 };

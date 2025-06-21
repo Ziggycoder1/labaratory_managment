@@ -43,6 +43,16 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Connect to MongoDB and start server only if successful
+const db = require('./config/database');
+
+db.once('open', () => {
+  console.log('Connected to MongoDB (from index.js)');
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+});
+db.on('error', (err) => {
+  console.error('Failed to connect to MongoDB:', err);
+  process.exit(1);
 }); 

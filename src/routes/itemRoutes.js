@@ -9,7 +9,7 @@ const { auth, checkRole } = require('../middleware/auth.middleware');
 const validateItem = [
     body('name').notEmpty().withMessage('Name is required'),
     body('type').isIn(['consumable', 'non_consumable', 'fixed']).withMessage('Invalid item type'),
-    body('lab_id').isInt().withMessage('Valid lab ID is required'),
+    body('lab').isMongoId().withMessage('Valid lab ID is required'),
     body('quantity').isInt({ min: 0 }).withMessage('Quantity must be a positive number'),
     body('unit').optional().isString(),
     body('expiry_date').optional().isISO8601().withMessage('Invalid expiry date'),
@@ -30,7 +30,7 @@ const validateStockAdjustment = [
 
 // Routes
 router.get('/items',
-    query('lab_id').optional().isInt(),
+    query('lab_id').optional().isMongoId(),
     query('type').optional().isIn(['consumable', 'non_consumable', 'fixed']),
     query('low_stock').optional().isBoolean(),
     query('expiring_soon').optional().isBoolean(),
@@ -40,7 +40,7 @@ router.get('/items',
 );
 
 router.get('/items/:id',
-    param('id').isInt().withMessage('Invalid item ID'),
+    param('id').isMongoId().withMessage('Invalid item ID'),
     itemController.getItemById
 );
 
@@ -54,7 +54,7 @@ router.post('/items',
 router.put('/items/:id',
     auth,
     checkRole(['admin', 'lab_manager']),
-    param('id').isInt().withMessage('Invalid item ID'),
+    param('id').isMongoId().withMessage('Invalid item ID'),
     validateItem,
     itemController.updateItem
 );
@@ -62,14 +62,14 @@ router.put('/items/:id',
 router.post('/items/:id/adjust',
     auth,
     checkRole(['admin', 'lab_manager']),
-    param('id').isInt().withMessage('Invalid item ID'),
+    param('id').isMongoId().withMessage('Invalid item ID'),
     validateStockAdjustment,
     itemController.adjustStock
 );
 
 router.get('/alerts',
     query('type').optional().isIn(['low_stock', 'expiring_soon', 'expired']),
-    query('lab_id').optional().isInt(),
+    query('lab_id').optional().isMongoId(),
     itemController.getAlerts
 );
 

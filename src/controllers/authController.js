@@ -1,23 +1,17 @@
-const pool = require('../config/database');
+const User = require('../models/User');
+const Department = require('../models/Department');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-
+const { sendPasswordResetEmail } = require('../utils/sendEmail');
 
 // Login user
 const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const [users] = await pool.query(
-      `SELECT u.*, d.name as department_name 
-       FROM users u 
-       LEFT JOIN departments d ON u.department_id = d.id 
-       WHERE u.email = ?`,
-      [email]
-    );
-
-    if (users.length === 0) {
+    const user = await User.findOne({ email }).populate('department');
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials',
@@ -25,9 +19,7 @@ const login = async (req, res) => {
       });
     }
 
-    const user = users[0];
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -37,13 +29,13 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    // Update last login
-    await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    user.last_login = new Date();
+    await user.save();
 
     res.json({
       success: true,
@@ -51,12 +43,12 @@ const login = async (req, res) => {
       data: {
         token,
         user: {
-          id: user.id,
+          id: user._id,
           email: user.email,
           name: user.full_name,
           role: user.role,
-          department_id: user.department_id,
-          department_name: user.department_name,
+          department_id: user.department?._id,
+          department_name: user.department?.name,
           created_at: user.created_at
         }
       }
@@ -76,9 +68,8 @@ const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
-    const [users] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-    
-    if (users.length === 0) {
+    const user = await User.findOne({ email });
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -90,14 +81,12 @@ const forgotPassword = async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
 
-    await pool.query(
-      'UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?',
-      [resetToken, resetTokenExpiry, users[0].id]
-    );
+    user.reset_token = resetToken;
+    user.reset_token_expiry = resetTokenExpiry;
+    await user.save();
 
-    // Send reset email
+    // Send reset email (assume sendPasswordResetEmail is implemented elsewhere)
     const emailSent = await sendPasswordResetEmail(email, resetToken);
-    
     if (!emailSent) {
       return res.status(500).json({
         success: false,
@@ -133,12 +122,8 @@ const resetPassword = async (req, res) => {
   }
 
   try {
-    const [users] = await pool.query(
-      'SELECT id FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()',
-      [token]
-    );
-
-    if (users.length === 0) {
+    const user = await User.findOne({ reset_token: token, reset_token_expiry: { $gt: new Date() } });
+    if (!user) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired reset token',
@@ -147,12 +132,10 @@ const resetPassword = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    await pool.query(
-      'UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?',
-      [hashedPassword, users[0].id]
-    );
+    user.password = await bcrypt.hash(password, salt);
+    user.reset_token = undefined;
+    user.reset_token_expiry = undefined;
+    await user.save();
 
     res.json({
       success: true,
@@ -181,15 +164,8 @@ const logout = async (req, res) => {
 // Get current user profile
 const getCurrentUser = async (req, res) => {
   try {
-    const [users] = await pool.query(
-      `SELECT u.*, d.name as department_name, d.code as department_code
-       FROM users u
-       LEFT JOIN departments d ON u.department_id = d.id
-       WHERE u.id = ?`,
-      [req.user.id]
-    );
-
-    if (users.length === 0) {
+    const user = await User.findById(req.user.id).populate('department');
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -197,23 +173,21 @@ const getCurrentUser = async (req, res) => {
       });
     }
 
-    const user = users[0];
-    
     // Get user permissions based on role
     const permissions = getPermissionsByRole(user.role);
 
     res.json({
       success: true,
       data: {
-        id: user.id,
+        id: user._id,
         email: user.email,
         name: user.full_name,
         role: user.role,
-        department_id: user.department_id,
+        department_id: user.department?._id,
         department: {
-          id: user.department_id,
-          name: user.department_name,
-          code: user.department_code
+          id: user.department?._id,
+          name: user.department?.name,
+          code: user.department?.code
         },
         permissions
       }
