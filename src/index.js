@@ -4,8 +4,8 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
-// Load environment variables from .env file in the project root
-const envPath = path.resolve(__dirname, '../../.env');
+// Load environment variables from .env file in the current directory
+const envPath = path.resolve(__dirname, '../.env');
 const result = dotenv.config({ path: envPath });
 
 // Log environment variables for debugging (remove in production)
