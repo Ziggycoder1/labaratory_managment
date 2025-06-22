@@ -7,7 +7,9 @@ const {
   forgotPassword,
   resetPassword,
   logout,
-  getCurrentUser
+  getCurrentUser,
+  verifyToken,
+  refreshToken
 } = require('../controllers/authController');
 
 // Public routes
@@ -15,9 +17,11 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+router.post('/verify-token', verifyToken);
+router.post('/refresh-token', refreshToken);
 
 // Protected routes
 router.post('/logout', auth, logout);
 router.get('/me', auth, getCurrentUser);
 
-module.exports = router; 
+module.exports = router;

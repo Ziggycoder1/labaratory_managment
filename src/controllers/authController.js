@@ -5,7 +5,114 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../utils/sendEmail');
 
+// Validate required environment variables
+const requiredEnvVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars.join(', '));
+  process.exit(1);
+}
+
 // Login user
+// Verify token
+const verifyToken = async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided',
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Token is valid',
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.full_name,
+          role: user.role,
+          department_id: user.department?._id,
+        },
+      },
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired',
+      });
+    }
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token',
+    });
+  }
+};
+
+// Refresh token
+const refreshToken = async (req, res) => {
+  try {
+    const refreshToken = req.body.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'No refresh token provided',
+      });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token',
+      });
+    }
+
+    // Generate new access token
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          name: user.full_name,
+          role: user.role,
+          department_id: user.department?._id,
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid refresh token',
+    });
+  }
+};
+
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -28,13 +135,44 @@ const login = async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    // Debug: Log the JWT_SECRET (first 5 chars for security)
+    console.log('JWT_SECRET:', process.env.JWT_SECRET ? 
+      `${process.env.JWT_SECRET.substring(0, 5)}...` : 'Not set');
+    
+    if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+      console.error('JWT secrets are not properly configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Server configuration error',
+        errors: ['Authentication service is not properly configured']
+      });
+    }
+
+    let token, refreshToken;
+    
+    try {
+      token = jwt.sign(
+        { id: user._id, email: user.email, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      refreshToken = jwt.sign(
+        { id: user._id },
+        process.env.JWT_REFRESH_SECRET,
+        { expiresIn: '7d' }
+      );
+    } catch (jwtError) {
+      console.error('JWT Error:', jwtError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error generating authentication tokens',
+        errors: [jwtError.message]
+      });
+    }
 
     user.last_login = new Date();
+    user.refresh_token = refreshToken;
     await user.save();
 
     res.json({
@@ -42,6 +180,7 @@ const login = async (req, res) => {
       message: 'Login successful',
       data: {
         token,
+        refreshToken,
         user: {
           id: user._id,
           email: user.email,
@@ -323,5 +462,7 @@ module.exports = {
   resetPassword,
   logout,
   getCurrentUser,
-  register
-}; 
+  register,
+  verifyToken,
+  refreshToken,
+};

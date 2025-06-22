@@ -1,10 +1,25 @@
 const dotenv = require("dotenv");
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from .env file in the project root
+const envPath = path.resolve(__dirname, '../../.env');
+const result = dotenv.config({ path: envPath });
+
+// Log environment variables for debugging (remove in production)
+console.log('Environment variables loaded:', {
+  NODE_ENV: process.env.NODE_ENV,
+  JWT_SECRET: process.env.JWT_SECRET ? '***' : 'Not set',
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET ? '***' : 'Not set',
+  DB_URI: process.env.DB_URI ? '***' : 'Not set'
+});
+
+if (result.error) {
+  console.error('Error loading .env file:', result.error);
+  process.exit(1);
+}
 
 const app = express();
 
