@@ -203,6 +203,42 @@ const updateUser = async (req, res) => {
   }
 };
 
+// Toggle user status
+const toggleUserStatus = async (req, res) => {
+  try {
+    const { is_active } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { is_active },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        errors: []
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: user._id,
+        is_active: user.is_active,
+        message: `User ${user.is_active ? 'activated' : 'deactivated'} successfully`
+      }
+    });
+  } catch (error) {
+    console.error('Toggle user status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating user status',
+      errors: []
+    });
+  }
+};
+
 // Deactivate user
 const deactivateUser = async (req, res) => {
   const userId = req.params.id;
@@ -227,5 +263,6 @@ module.exports = {
   getUserById,
   createUser,
   updateUser,
-  deactivateUser
+  deactivateUser,
+  toggleUserStatus
 }; 

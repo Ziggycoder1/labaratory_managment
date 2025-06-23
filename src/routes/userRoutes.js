@@ -6,7 +6,8 @@ const {
   getUserById,
   createUser,
   updateUser,
-  deactivateUser
+  deactivateUser,
+  toggleUserStatus
 } = require('../controllers/userController');
 
 // Create new user (no auth required for testing)
@@ -16,6 +17,7 @@ router.post('/register', createUser);
 router.get('/', auth, checkRole(['admin', 'lab_manager']), getAllUsers);
 router.get('/:id', auth, checkRole(['admin', 'lab_manager']), getUserById);
 router.put('/:id', auth, checkRole(['admin']), updateUser);
+router.patch('/:id', auth, checkRole(['admin']), toggleUserStatus);
 router.delete('/:id', auth, checkRole(['admin']), deactivateUser);
 
-module.exports = router; 
+module.exports = router;
