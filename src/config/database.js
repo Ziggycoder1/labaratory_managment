@@ -2,10 +2,7 @@ const mongoose = require('mongoose');
 
 const DB_URI = process.env.DB_URI1 || 'mongodb://localhost:27017/lab_managment';
 
-mongoose.connect(DB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(DB_URI);
 
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));

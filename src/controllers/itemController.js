@@ -12,16 +12,21 @@ exports.getAllItems = async (req, res) => {
             page = 1,
             limit = 20
         } = req.query;
-
+        let filterLabId = lab_id;
+        // Department admin: only items for labs in their department
+        if (req.user && req.user.role === 'department_admin') {
+            const labs = await require('../models/Lab').find({ department: req.user.department._id }).select('_id');
+            const labIds = labs.map(l => l._id);
+            filterLabId = labIds.length > 0 ? labIds : null;
+        }
         const result = await Item.findAll({
-            lab_id,
+            lab_id: filterLabId,
             type,
             low_stock: low_stock === 'true',
             expiring_soon: expiring_soon === 'true',
             page: parseInt(page),
             limit: parseInt(limit)
         });
-
         res.json({
             success: true,
             data: result

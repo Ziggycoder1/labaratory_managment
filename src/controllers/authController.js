@@ -345,6 +345,7 @@ const getCurrentUser = async (req, res) => {
 const getPermissionsByRole = (role) => {
   const permissions = {
     admin: ['manage_users', 'manage_departments', 'manage_labs', 'manage_items', 'view_reports'],
+    department_admin: ['manage_department_users', 'manage_department_labs', 'manage_department_items', 'view_department_reports'],
     lab_manager: ['manage_labs', 'manage_items', 'view_reports'],
     teacher: ['book_lab', 'request_consumables', 'borrow_tools', 'view_reports'],
     student: ['book_lab', 'request_consumables', 'borrow_tools'],

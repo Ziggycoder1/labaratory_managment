@@ -11,6 +11,14 @@ const getAllStockLogs = async (req, res) => {
     
     if (item_id) filter.item = item_id;
     if (user_id) filter.user = user_id;
+    // Department admin: only stock logs for items in labs in their department
+    if (req.user && req.user.role === 'department_admin') {
+      const labs = await require('../models/Lab').find({ department: req.user.department._id }).select('_id');
+      const labIds = labs.map(l => l._id);
+      const items = await require('../models/Item').find({ lab: { $in: labIds } }).select('_id');
+      const itemIds = items.map(i => i._id);
+      filter.item = { $in: itemIds };
+    }
 
     const skip = (page - 1) * limit;
     const totalCount = await StockLog.countDocuments(filter);

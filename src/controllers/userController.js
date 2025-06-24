@@ -8,15 +8,30 @@ const getAllUsers = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+    
+    // Build filter object
     const filter = {};
+    
+    // Role-based filtering
     if (req.query.role) filter.role = req.query.role;
-    if (req.query.department_id) filter.department = req.query.department_id;
+    
+    // Department filtering
+    if (req.user.role === 'department_admin') {
+      // Department admins can only see users from their department
+      filter.department = req.user.department._id;
+    } else if (req.query.department_id) {
+      // Other roles can filter by department if specified
+      filter.department = req.query.department_id;
+    }
+    
+    // Search filtering
     if (req.query.search) {
       filter.$or = [
         { full_name: { $regex: req.query.search, $options: 'i' } },
         { email: { $regex: req.query.search, $options: 'i' } }
       ];
     }
+
     const totalCount = await User.countDocuments(filter);
     const users = await User.find(filter)
       .populate('department', 'name')
@@ -24,6 +39,7 @@ const getAllUsers = async (req, res) => {
       .skip(skip)
       .limit(limit)
       .lean();
+
     res.json({
       success: true,
       data: {
@@ -107,7 +123,7 @@ const createUser = async (req, res) => {
       errors: []
     });
   }
-  const validRoles = ['admin', 'lab_manager', 'teacher', 'student', 'external'];
+  const validRoles = ['admin', 'department_admin', 'lab_manager', 'teacher', 'student', 'external'];
   if (!validRoles.includes(role)) {
     return res.status(400).json({
       success: false,

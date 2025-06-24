@@ -31,6 +31,13 @@ const getAllBookings = async (req, res) => {
       if (end_date) filter.start_time.$lte = new Date(end_date);
     }
 
+    // Department admin: only bookings for labs in their department
+    if (req.user && req.user.role === 'department_admin') {
+      const labs = await Lab.find({ department: req.user.department._id }).select('_id');
+      const labIds = labs.map(l => l._id);
+      filter.lab = { $in: labIds };
+    }
+
     const skip = (page - 1) * limit;
     const totalCount = await Booking.countDocuments(filter);
     
