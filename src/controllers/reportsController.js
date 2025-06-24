@@ -56,16 +56,12 @@ const getDashboardReport = async (req, res) => {
     const total_users = await User.countDocuments();
     const active_this_month = await User.countDocuments({ last_login: { $gte: startOfMonth, $lte: endOfMonth } });
     const new_registrations = await User.countDocuments({ created_at: { $gte: startOfMonth, $lte: endOfMonth } });
+    // Dynamically count all roles
     const byRoleAgg = await User.aggregate([
       { $group: { _id: '$role', count: { $sum: 1 } } }
     ]);
-    const by_role = { students: 0, teachers: 0, lab_managers: 0, admins: 0 };
-    byRoleAgg.forEach(r => {
-      if (r._id === 'student' || r._id === 'students') by_role.students += r.count;
-      else if (r._id === 'teacher' || r._id === 'teachers') by_role.teachers += r.count;
-      else if (r._id === 'lab_manager' || r._id === 'lab_managers') by_role.lab_managers += r.count;
-      else if (r._id === 'admin' || r._id === 'admins') by_role.admins += r.count;
-    });
+    const by_role = {};
+    byRoleAgg.forEach(r => { by_role[r._id] = r.count; });
 
     // Stock
     const total_items = await Item.countDocuments(lab_id ? { lab: lab_id } : {});
@@ -90,7 +86,7 @@ const getDashboardReport = async (req, res) => {
       .lean();
     const recent_activities = recentBookings.map(b => ({
       type: 'booking_created',
-      user: b.user?.full_name || '',
+      user: b.user && b.user.full_name ? b.user.full_name : (b.user ? b.user.toString() : ''),
       description: `Booked ${b.lab?.name || ''}`,
       timestamp: b.createdAt || b.created_at || b.start_time
     }));
