@@ -40,6 +40,7 @@ const itemRoutes = require('./routes/itemRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const borrowLogRoutes = require('./routes/borrowLogRoutes');
 const stockLogRoutes = require('./routes/stockLogRoutes');
+const reportsRoutes = require('./routes/reportsRoutes');
 
 app.use('/api/departments', departmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -51,6 +52,8 @@ app.use('/api/stock', itemRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/borrow-logs', borrowLogRoutes);
 app.use('/api/stock-logs', stockLogRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/files/reports', express.static(path.join(__dirname, '../reports')));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

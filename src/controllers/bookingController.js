@@ -683,103 +683,81 @@ const getBookingStats = async (req, res) => {
 // Get booking calendar view
 const getBookingCalendar = async (req, res) => {
   try {
-    const { lab_id, field_id, start_date, end_date, view = 'month' } = req.query;
-    
-    let filter = {
-      status: { $in: ['pending', 'approved'] }
-    };
-    
-    if (lab_id) filter.lab = lab_id;
-    if (field_id) filter.field = field_id;
-    
-    // Date range filter
-    if (start_date && end_date) {
-      filter.start_time = {
-        $gte: new Date(start_date),
-        $lte: new Date(end_date)
-      };
+    const { lab_id, month, view = 'month' } = req.query;
+    // Parse month (YYYY-MM) or use current month
+    let startDate, endDate;
+    if (month) {
+      const [year, mon] = month.split('-').map(Number);
+      startDate = new Date(year, mon - 1, 1);
+      endDate = new Date(year, mon, 0, 23, 59, 59, 999);
     } else {
-      // Default to current month if no dates provided
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      filter.start_time = {
-        $gte: startOfMonth,
-        $lte: endOfMonth
-      };
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     }
+    console.log('Calendar Query Range:', { startDate, endDate });
+    const filter = {
+      status: { $in: ['pending', 'approved'] },
+      start_time: { $gte: startDate, $lte: endDate }
+    };
+    if (lab_id) filter.lab = lab_id;
 
+    // Populate field and user for names
     const bookings = await Booking.find(filter)
-      .populate('lab', 'name code color')
-      .populate('field', 'name code')
-      .populate('user', 'full_name email')
-      .populate('item_requirements.item', 'name type')
+      .populate('field', 'name')
+      .populate('user', 'full_name')
       .sort({ start_time: 1 })
       .lean();
+    console.log('Bookings found:', bookings.map(b => ({
+      _id: b._id,
+      start_time: b.start_time,
+      end_time: b.end_time,
+      status: b.status
+    })));
 
-    // Group bookings by date for calendar view
-    const calendarData = {};
-    
+    // Group bookings by date
+    const calendarMap = {};
     bookings.forEach(booking => {
       const dateKey = new Date(booking.start_time).toISOString().split('T')[0];
-      
-      if (!calendarData[dateKey]) {
-        calendarData[dateKey] = [];
-      }
-      
-      calendarData[dateKey].push({
+      if (!calendarMap[dateKey]) calendarMap[dateKey] = [];
+      calendarMap[dateKey].push({
         id: booking._id,
-        title: `${booking.lab.name} - ${booking.user.full_name}`,
-        start: booking.start_time,
-        end: booking.end_time,
-        lab: booking.lab,
-        field: booking.field,
-        user: booking.user,
-        purpose: booking.purpose,
-        booking_type: booking.booking_type,
-        participants_count: booking.participants_count,
-        status: booking.status,
-        item_requirements: booking.item_requirements,
-        equipment_needed: booking.equipment_needed,
-        special_instructions: booking.special_instructions,
-        setup_time_needed: booking.setup_time_needed,
-        cleanup_time_needed: booking.cleanup_time_needed
+        start_time: new Date(booking.start_time).toISOString().substr(11, 5),
+        end_time: new Date(booking.end_time).toISOString().substr(11, 5),
+        field_name: booking.field?.name || '',
+        user_name: booking.user?.full_name || '',
+        status: booking.status
       });
     });
-
-    // Generate calendar events for frontend calendar libraries
-    const calendarEvents = bookings.map(booking => ({
-      id: booking._id,
-      title: `${booking.lab.name} - ${booking.user.full_name}`,
-      start: booking.start_time,
-      end: booking.end_time,
-      backgroundColor: booking.status === 'approved' ? '#28a745' : '#ffc107',
-      borderColor: booking.status === 'approved' ? '#1e7e34' : '#e0a800',
-      textColor: '#ffffff',
-      extendedProps: {
-        lab: booking.lab,
-        field: booking.field,
-        user: booking.user,
-        purpose: booking.purpose,
-        booking_type: booking.booking_type,
-        participants_count: booking.participants_count,
-        status: booking.status,
-        item_requirements: booking.item_requirements,
-        equipment_needed: booking.equipment_needed,
-        special_instructions: booking.special_instructions
-      }
+    // Convert to array format
+    const calendar_data = Object.keys(calendarMap).map(date => ({
+      date,
+      bookings: calendarMap[date]
     }));
+
+    // Statistics
+    const total_bookings = bookings.length;
+    const approved_bookings = bookings.filter(b => b.status === 'approved').length;
+    const pending_bookings = bookings.filter(b => b.status === 'pending').length;
+    // Utilization rate: sum of booking hours / total available hours in month (lab open 8am-8pm, 12h/day)
+    let utilization_rate = 0;
+    if (total_bookings > 0) {
+      const totalBookedHours = bookings.reduce((sum, b) => sum + ((new Date(b.end_time) - new Date(b.start_time)) / (1000 * 60 * 60)), 0);
+      const daysInMonth = (endDate.getDate() - startDate.getDate() + 1);
+      const totalAvailableHours = daysInMonth * 12; // 12 hours per day
+      utilization_rate = totalAvailableHours > 0 ? (totalBookedHours / totalAvailableHours) * 100 : 0;
+      utilization_rate = Math.round(utilization_rate * 10) / 10;
+    }
 
     res.json({
       success: true,
       data: {
-        calendarData,
-        calendarEvents,
-        total_bookings: bookings.length,
-        date_range: {
-          start: start_date || new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-          end: end_date || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+        calendar_data,
+        statistics: {
+          total_bookings,
+          approved_bookings,
+          pending_bookings,
+          utilization_rate
         }
       }
     });
