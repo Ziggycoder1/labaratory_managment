@@ -1,11 +1,27 @@
 const express = require('express');
 const router = express.Router();
 const { auth, checkRole } = require('../middleware/auth.middleware');
-const { getAllDepartments, createDepartment } = require('../controllers/departmentController');
+const { 
+  getAllDepartments, 
+  createDepartment, 
+  getDepartmentById, 
+  updateDepartment, 
+  deleteDepartment 
+} = require('../controllers/departmentController');
 
+// Get all departments
+router.get('/', auth, checkRole(['admin', 'lab_manager']), getAllDepartments);
 
-router.get('/', getAllDepartments);
+// Get single department
+router.get('/:id', auth, checkRole(['admin', 'lab_manager']), getDepartmentById);
 
-router.post('/add', createDepartment);
+// Create new department
+router.post('/add', auth, checkRole(['admin']), createDepartment);
 
-module.exports = router; 
+// Update department
+router.put('/:id', auth, checkRole(['admin']), updateDepartment);
+
+// Delete department
+router.delete('/:id', auth, checkRole(['admin']), deleteDepartment);
+
+module.exports = router;
