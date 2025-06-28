@@ -16,7 +16,7 @@ router.get('/', auth, checkRole(['admin', 'lab_manager']), getAllDepartments);
 router.get('/:id', auth, checkRole(['admin', 'lab_manager']), getDepartmentById);
 
 // Create new department
-router.post('/add', auth, checkRole(['admin']), createDepartment);
+router.post('/', auth, checkRole(['admin']), createDepartment);
 
 // Update department
 router.put('/:id', auth, checkRole(['admin']), updateDepartment);

@@ -16,4 +16,4 @@ fieldSchema.virtual('labs', {
 });
 
 const Field = mongoose.model('Field', fieldSchema);
-module.exports = Field; 
+module.exports = Field;

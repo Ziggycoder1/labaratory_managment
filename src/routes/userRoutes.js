@@ -7,7 +7,8 @@ const {
   createUser,
   updateUser,
   deactivateUser,
-  toggleUserStatus
+  toggleUserStatus,
+  deleteUserPermanently
 } = require('../controllers/userController');
 
 // Create new user (no auth required for testing)
@@ -44,11 +45,19 @@ router.put('/:id',
 
 router.patch('/:id', auth, checkRole(['admin']), toggleUserStatus);
 
+// Deactivate user (soft delete)
 router.delete('/:id', 
   auth, 
   checkRole(['admin', 'department_admin']), 
   checkDepartmentAccess,
   deactivateUser
+);
+
+// Permanently delete user (admin only)
+router.delete('/:id/permanent', 
+  auth, 
+  checkRole(['admin']), 
+  deleteUserPermanently
 );
 
 module.exports = router;

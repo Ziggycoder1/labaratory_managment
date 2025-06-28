@@ -258,17 +258,86 @@ const toggleUserStatus = async (req, res) => {
 // Deactivate user
 const deactivateUser = async (req, res) => {
   const userId = req.params.id;
+  console.log('Deactivating user ID:', userId);
+  
   try {
-    await User.findByIdAndUpdate(userId, { is_active: false });
+    const user = await User.findByIdAndUpdate(
+      userId, 
+      { is_active: false },
+      { new: true, runValidators: true }
+    );
+    
+    if (!user) {
+      console.log('User not found with ID:', userId);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        errors: []
+      });
+    }
+    
+    console.log('Successfully deactivated user:', user.email);
     res.json({
       success: true,
-      message: 'User deactivated successfully'
+      message: 'User deactivated successfully',
+      data: {
+        id: user._id,
+        is_active: user.is_active
+      }
     });
   } catch (error) {
     console.error('Deactivate user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deactivating user',
+      message: 'Error deactivating user: ' + error.message,
+      errors: [error.message]
+    });
+  }
+};
+
+// Permanently delete a user (admin only)
+const deleteUserPermanently = async (req, res) => {
+  const userId = req.params.id;
+  
+  try {
+    // Only allow admins to permanently delete users
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin users can permanently delete users',
+        errors: []
+      });
+    }
+
+    // Prevent admins from deleting themselves
+    if (userId === req.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account',
+        errors: []
+      });
+    }
+
+    // Find and delete the user
+    const user = await User.findByIdAndDelete(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        errors: []
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User permanently deleted successfully'
+    });
+  } catch (error) {
+    console.error('Permanent delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error permanently deleting user',
       errors: []
     });
   }
@@ -280,5 +349,6 @@ module.exports = {
   createUser,
   updateUser,
   deactivateUser,
-  toggleUserStatus
+  toggleUserStatus,
+  deleteUserPermanently
 }; 
