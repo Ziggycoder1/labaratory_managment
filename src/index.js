@@ -41,6 +41,10 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const borrowLogRoutes = require('./routes/borrowLogRoutes');
 const stockLogRoutes = require('./routes/stockLogRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const fileRoutes = require('./routes/fileRoutes');
+const systemRoutes = require('./routes/systemRoutes');
 
 app.use('/api/departments', departmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -53,6 +57,11 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/borrow-logs', borrowLogRoutes);
 app.use('/api/stock-logs', stockLogRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/files', fileRoutes);
+app.use('/api/system', systemRoutes);
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/files/reports', express.static(path.join(__dirname, '../reports')));
 
 // Error handling middleware
