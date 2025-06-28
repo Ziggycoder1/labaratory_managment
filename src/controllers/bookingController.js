@@ -12,18 +12,18 @@ const {
 // Get all bookings with filters
 const getAllBookings = async (req, res) => {
   try {
-    const { 
-      lab_id, field_id, user_id, status, booking_type, 
-      start_date, end_date, page = 1, limit = 20 
+    const {
+      lab_id, field_id, user_id, status, booking_type,
+      start_date, end_date, page = 1, limit = 20
     } = req.query;
     const filter = {};
-    
+
     if (lab_id) filter.lab = lab_id;
     if (field_id) filter.field = field_id;
     if (user_id) filter.user = user_id;
     if (status) filter.status = status;
     if (booking_type) filter.booking_type = booking_type;
-    
+
     // Date range filter
     if (start_date || end_date) {
       filter.start_time = {};
@@ -40,22 +40,45 @@ const getAllBookings = async (req, res) => {
 
     const skip = (page - 1) * limit;
     const totalCount = await Booking.countDocuments(filter);
-    
+
     const bookings = await Booking.find(filter)
-      .populate('lab', 'name code capacity')
-      .populate('field', 'name code')
-      .populate('user', 'full_name email department')
-      .populate('approved_by', 'full_name email')
-      .populate('item_requirements.item', 'name type available_quantity')
+      .populate('lab', 'name')
+      .populate('field', 'name')
+      .populate('user', 'full_name role')
+      .populate('approved_by', 'full_name')
+      .populate('item_requirements.item', 'name')
       .sort({ start_time: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
+    const mappedBookings = bookings.map(b => ({
+      id: b._id,
+      lab_id: b.lab?._id,
+      lab_name: b.lab?.name,
+      field_id: b.field?._id,
+      field_name: b.field?.name,
+      user_id: b.user?._id,
+      user_name: b.user?.full_name,
+      user_role: b.user?.role,
+      start_time: b.start_time ? new Date(b.start_time).toISOString() : null,
+      end_time: b.end_time ? new Date(b.end_time).toISOString() : null,
+      purpose: b.purpose,
+      status: b.status,
+      requested_consumables: (b.item_requirements || []).map(req => ({
+        item_id: req.item?._id,
+        item_name: req.item?.name,
+        quantity: req.quantity_needed
+      })),
+      created_at: b.createdAt ? new Date(b.createdAt).toISOString() : null,
+      approved_at: b.approved_at ? new Date(b.approved_at).toISOString() : null,
+      approved_by: b.approved_by?.full_name || null
+    }));
+
     res.json({
       success: true,
       data: {
-        bookings,
+        bookings: mappedBookings,
         pagination: {
           current_page: parseInt(page),
           total_pages: Math.ceil(totalCount / limit),
