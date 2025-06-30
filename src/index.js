@@ -45,6 +45,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
 const fileRoutes = require('./routes/fileRoutes');
 const systemRoutes = require('./routes/systemRoutes');
+const permissionRoutes = require('./routes/permissionRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 
 app.use('/api/departments', departmentRoutes);
 app.use('/api/auth', authRoutes);
@@ -61,18 +63,14 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/permissions', permissionRoutes);
+app.use('/api/roles', roleRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/files/reports', express.static(path.join(__dirname, '../reports')));
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
+const { errorHandler } = require('./middleware/error.middleware');
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
