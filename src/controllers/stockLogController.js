@@ -7,11 +7,49 @@ const { validationResult } = require('express-validator');
 // Get all stock logs with filters
 const getAllStockLogs = async (req, res) => {
   try {
-    const { item_id, user_id, page = 1, limit = 20 } = req.query;
+    console.log('Received request with query params:', req.query);
+    
+    const { 
+      itemId, 
+      labId, 
+      userId, 
+      type, 
+      startDate, 
+      endDate, 
+      search,
+      page = 1, 
+      limit = 20,
+      populate = 'item,user,lab',
+      sort = '-createdAt'
+    } = req.query;
+
+    // Build filter object
     const filter = {};
     
-    if (item_id) filter.item = item_id;
-    if (user_id) filter.user = user_id;
+    if (itemId) filter.item = itemId;
+    if (labId) filter.lab = labId;
+    if (userId) filter.user = userId;
+    if (type) filter.type = type;
+    
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    // Search filter
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      filter.$or = [
+        { 'item.name': searchRegex },
+        { 'user.full_name': searchRegex },
+        { 'lab.name': searchRegex },
+        { reason: searchRegex },
+        { notes: searchRegex }
+      ];
+    }
+
     // Department admin: only stock logs for items in labs in their department
     if (req.user && req.user.role === 'department_admin') {
       const labs = await require('../models/Lab').find({ department: req.user.department._id }).select('_id');
@@ -21,29 +59,55 @@ const getAllStockLogs = async (req, res) => {
       filter.item = { $in: itemIds };
     }
 
+    console.log('Built filter:', JSON.stringify(filter, null, 2));
+
     const skip = (page - 1) * limit;
     const totalCount = await StockLog.countDocuments(filter);
     
-    const stockLogs = await StockLog.find(filter)
-      .populate('item', 'name type')
-      .populate('user', 'full_name email')
-      .sort({ created_at: -1 })
+    // Build populate options
+    const populateOptions = populate.split(',').map(field => {
+      if (field === 'item') return { path: 'item', select: 'name type' };
+      if (field === 'user') return { path: 'user', select: 'full_name email' };
+      if (field === 'lab') return { path: 'lab', select: 'name' };
+      return field;
+    }).filter(Boolean);
+
+    console.log('Populate options:', populateOptions);
+    
+    // Execute query
+    const query = StockLog.find(filter);
+    
+    // Apply population
+    populateOptions.forEach(option => {
+      if (typeof option === 'object') {
+        query.populate(option);
+      } else if (typeof option === 'string') {
+        query.populate(option);
+      }
+    });
+    
+    const stockLogs = await query
+      .sort(sort)
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
-    res.json({
+    console.log(`Found ${stockLogs.length} stock logs`);
+
+    // Return data in the format expected by the frontend
+    const response = {
       success: true,
-      data: {
-        stockLogs,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(totalCount / limit),
-          total_count: totalCount,
-          per_page: parseInt(limit)
-        }
+      data: stockLogs,
+      pagination: {
+        current_page: parseInt(page),
+        total_pages: Math.ceil(totalCount / limit),
+        total_count: totalCount,
+        per_page: parseInt(limit)
       }
-    });
+    };
+
+    console.log('Sending response with data length:', response.data.length);
+    res.json(response);
   } catch (error) {
     console.error('Get stock logs error:', error);
     res.status(500).json({

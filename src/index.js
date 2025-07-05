@@ -40,6 +40,7 @@ const itemRoutes = require('./routes/itemRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const borrowLogRoutes = require('./routes/borrowLogRoutes');
 const stockLogRoutes = require('./routes/stockLogRoutes');
+const stockRoutes = require('./routes/stockRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
@@ -58,6 +59,7 @@ app.use('/api/items', itemRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/borrow-logs', borrowLogRoutes);
 app.use('/api/stock-logs', stockLogRoutes);
+app.use('/api/stock', stockRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
@@ -72,10 +74,15 @@ app.use('/api/files/reports', express.static(path.join(__dirname, '../reports'))
 const { errorHandler } = require('./middleware/error.middleware');
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
+// Start scheduled jobs
+if (process.env.NODE_ENV !== 'test') {
+  const stockChecks = require('./jobs/stockChecks');
+  stockChecks.start();
+}
 
 // Connect to MongoDB and start server only if successful
 const db = require('./config/database');
+const PORT = process.env.PORT || 3000;
 
 db.once('open', () => {
   console.log('Connected to MongoDB (from index.js)');

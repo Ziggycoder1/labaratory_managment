@@ -2,22 +2,22 @@ const mongoose = require('mongoose');
 
 const DB_URI = process.env.DB_URI1 || 'mongodb://localhost:27017/lab_managment';
 
-mongoose.connect(DB_URI);
+// Connect to MongoDB
+mongoose.connect(DB_URI, {
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+  family: 4 // Use IPv4, skip trying IPv6
+});
 
 const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+
+db.on('error', (error) => {
+  console.error('MongoDB connection error:', error);
+  process.exit(1);
+});
+
 db.once('open', () => {
   console.log('Connected to MongoDB');
 });
-
-const borrowLogSchema = new mongoose.Schema({
-  item: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  lab: { type: mongoose.Schema.Types.ObjectId, ref: 'Lab', required: true },
-  borrow_date: { type: Date, default: Date.now },
-  return_date: { type: Date },
-  status: { type: String, enum: ['borrowed', 'returned'], default: 'borrowed' },
-  notes: { type: String }
-}, { timestamps: true });
 
 module.exports = db; 

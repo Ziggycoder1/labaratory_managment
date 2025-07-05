@@ -11,7 +11,11 @@ const itemSchema = new Schema({
   expiry_date: { type: Date },
   minimum_quantity: { type: Number, required: true },
   description: { type: String },
-  status: { type: String, default: 'available' },
+  status: { 
+    type: String, 
+    enum: ['available', 'low_stock', 'out_of_stock', 'expired', 'in_maintenance'],
+    default: 'available' 
+  },
   deleted_at: { type: Date, default: null },
 }, { timestamps: true });
 
@@ -115,28 +119,82 @@ itemSchema.statics.updateItem = async function(id, updateData) {
   return !!result;
 };
 
-itemSchema.statics.adjustStock = async function(id, adjustmentData) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
-    const item = await this.findById(id).session(session);
-    if (!item) throw new Error('Item not found');
-            const adjustment = adjustmentData.adjustment_type === 'add' 
-                ? adjustmentData.quantity 
-                : -adjustmentData.quantity;
-    item.quantity += adjustment;
-    item.available_quantity += adjustment;
-    await item.save();
-    // You may want to log the stock adjustment in a separate collection
-    await session.commitTransaction();
-    session.endSession();
-    return item;
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    throw err;
+itemSchema.statics.adjustStock = async function(id, adjustmentData, session = null) {
+  const options = session ? { session } : {};
+  const item = await this.findById(id, null, options);
+  if (!item) throw new Error('Item not found');
+  
+  const adjustment = adjustmentData.adjustment_type === 'add' 
+    ? adjustmentData.quantity 
+    : -adjustmentData.quantity;
+    
+  item.quantity += adjustment;
+  item.available_quantity += adjustment;
+  
+  // Validate available quantity is not negative
+  if (item.available_quantity < 0) {
+    throw new Error('Insufficient stock available');
   }
+  
+  await item.save({ ...options, validateBeforeSave: true });
+  return item;
 };
+
+// Instance methods
+itemSchema.methods.checkStockLevels = async function() {
+  if (this.available_quantity <= 0) {
+    this.status = 'out_of_stock';
+  } else if (this.available_quantity <= this.minimum_quantity) {
+    this.status = 'low_stock';
+  } else {
+    this.status = 'available';
+  }
+  
+  // Check for expiry
+  if (this.expiry_date && new Date(this.expiry_date) < new Date()) {
+    this.status = 'expired';
+  }
+  
+  return this.save();
+};
+
+// Static methods
+itemSchema.statics.getLowStockItems = async function(labId = null) {
+  const filter = {
+    $expr: { $lte: ["$available_quantity", "$minimum_quantity"] },
+    status: { $ne: 'out_of_stock' }
+  };
+  
+  if (labId) {
+    filter.lab = labId;
+  }
+  
+  return this.find(filter).populate('lab', 'name');
+};
+
+itemSchema.statics.getExpiringItems = async function(days = 30, labId = null) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  
+  const filter = {
+    expiry_date: { $lte: date, $gte: new Date() },
+    status: { $ne: 'expired' }
+  };
+  
+  if (labId) {
+    filter.lab = labId;
+  }
+  
+  return this.find(filter).populate('lab', 'name');
+};
+
+// Pre-save hook to validate stock levels
+itemSchema.pre('save', function(next) {
+  if (this.isModified('available_quantity') && this.available_quantity < 0) {
+    throw new Error('Available quantity cannot be negative');
+  }
+  next();
+});
 
 const Item = mongoose.model('Item', itemSchema);
 module.exports = Item; 
