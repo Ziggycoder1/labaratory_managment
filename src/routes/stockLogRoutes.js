@@ -19,12 +19,20 @@ router.get('/',
   stockLogController.getAllStockLogs
 );
 
-// Get specific stock log
-router.get('/:id',
+// Movement data endpoint - must come before :id route
+router.get('/movement-data',
   auth,
   checkRole(['admin', 'lab_manager']),
-  param('id').isMongoId().withMessage('Stock log ID must be a valid MongoDB ID'),
-  stockLogController.getStockLogById
+  query('item_ids').isString().withMessage('Item IDs must be a comma-separated string of valid MongoDB IDs'),
+  stockLogController.getItemsMovementData
+);
+
+// Get stock logs by item
+router.get('/item/:item_id',
+  auth,
+  checkRole(['admin', 'lab_manager']),
+  param('item_id').isMongoId().withMessage('Item ID must be a valid MongoDB ID'),
+  stockLogController.getStockLogsByItem
 );
 
 // Create stock log (add/remove stock)
@@ -35,12 +43,12 @@ router.post('/',
   stockLogController.createStockLog
 );
 
-// Get stock logs by item
-router.get('/item/:item_id',
+// Get specific stock log - must come after all other GET routes
+router.get('/:id',
   auth,
   checkRole(['admin', 'lab_manager']),
-  param('item_id').isMongoId().withMessage('Item ID must be a valid MongoDB ID'),
-  stockLogController.getStockLogsByItem
+  param('id').isMongoId().withMessage('Stock log ID must be a valid MongoDB ID'),
+  stockLogController.getStockLogById
 );
 
 // Get stock logs by user
@@ -58,4 +66,4 @@ router.get('/summary/dashboard',
   stockLogController.getStockSummary
 );
 
-module.exports = router; 
+module.exports = router;

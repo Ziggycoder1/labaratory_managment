@@ -12,11 +12,28 @@ const itemSchema = new Schema({
   minimum_quantity: { type: Number, required: true },
   description: { type: String },
   status: { type: String, default: 'available' },
+  deleted_at: { type: Date, default: null },
 }, { timestamps: true });
 
 // Static methods
-itemSchema.statics.findAll = async function({ lab_id, type, low_stock, expiring_soon, page = 1, limit = 20 }) {
+itemSchema.statics.findAll = async function({ 
+  lab_id, 
+  type, 
+  low_stock, 
+  expiring_soon, 
+  include = 'active',
+  page = 1, 
+  limit = 20 
+}) {
   const filter = {};
+  
+  // Handle soft delete filtering
+  if (include === 'active') {
+    filter.deleted_at = null;
+  } else if (include === 'deleted') {
+    filter.deleted_at = { $ne: null };
+  }
+  // If include is 'all', don't filter by deleted_at
   const soon = new Date();
   soon.setDate(soon.getDate() + 30);
   

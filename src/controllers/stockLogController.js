@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const StockLog = require('../models/StockLog');
 const Item = require('../models/Item');
 const User = require('../models/User');
@@ -244,43 +245,6 @@ const getStockSummary = async (req, res) => {
     if (lab_id) filter.lab = lab_id;
 
     // Get items with their current stock levels
-    const items = await Item.find(filter)
-      .populate('lab', 'name')
-      .lean();
-
-    // Calculate summary statistics
-    const summary = {
-      total_items: items.length,
-      low_stock_items: items.filter(item => item.available_quantity <= item.minimum_quantity).length,
-      out_of_stock_items: items.filter(item => item.available_quantity === 0).length,
-      total_value: items.reduce((sum, item) => sum + (item.quantity || 0), 0)
-    };
-
-    // Get recent stock movements
-    const recentMovements = await StockLog.find()
-      .populate('item', 'name type')
-      .populate('user', 'full_name')
-      .sort({ created_at: -1 })
-      .limit(10)
-      .lean();
-
-    res.json({
-      success: true,
-      data: {
-        summary,
-        recentMovements,
-        items: items.map(item => ({
-          id: item._id,
-          name: item.name,
-          type: item.type,
-          quantity: item.quantity,
-          available_quantity: item.available_quantity,
-          minimum_quantity: item.minimum_quantity,
-          lab: item.lab?.name,
-          status: item.available_quantity <= item.minimum_quantity ? 'low_stock' : 'normal'
-        }))
-      }
-    });
   } catch (error) {
     console.error('Get stock summary error:', error);
     res.status(500).json({
@@ -291,11 +255,181 @@ const getStockSummary = async (req, res) => {
   }
 };
 
+/**
+ * Get movement data for specific items
+ */
+const getItemsMovementData = async (req, res) => {
+  try {
+    const { item_ids } = req.query;
+    
+    if (!item_ids) {
+      return res.status(400).json({
+        success: false,
+        message: 'Item IDs are required',
+        errors: ['item_ids parameter is required']
+      });
+    }
+
+    const itemIds = item_ids.split(',');
+    
+    // Get stock logs for these items, grouped by item
+    // Validate and convert item IDs
+    const validItemIds = [];
+    const invalidItemIds = [];
+    
+    for (const id of itemIds) {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        validItemIds.push(new mongoose.Types.ObjectId(id));
+      } else {
+        invalidItemIds.push(id);
+        console.warn(`Invalid item ID: ${id}`);
+      }
+    }
+
+    if (validItemIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid item IDs provided',
+        errors: ['All provided item IDs are invalid'],
+        invalidItemIds
+      });
+    }
+
+    if (invalidItemIds.length > 0) {
+      console.warn(`Proceeding with ${validItemIds.length} valid item IDs, ignoring ${invalidItemIds.length} invalid IDs`);
+    }
+
+    const itemsMovementData = await StockLog.aggregate([
+      { 
+        $match: { 
+          item: { $in: validItemIds } 
+        } 
+      },
+      { $sort: { created_at: -1 } },
+      {
+        $group: {
+          _id: '$item',
+          lastMovement: { $first: '$created_at' },
+          lastChange: { $first: '$change_quantity' },
+          lastChangeType: { $first: '$type' },
+          lastChangeBy: { $first: '$user' },
+          totalChanges: { $sum: 1 },
+          avgChange: { $avg: '$change_quantity' },
+          totalIn: {
+            $sum: {
+              $cond: [{ $gt: ['$change_quantity', 0] }, '$change_quantity', 0]
+            }
+          },
+          totalOut: {
+            $sum: {
+              $cond: [{ $lt: ['$change_quantity', 0] }, { $multiply: ['$change_quantity', -1] }, 0]
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'lastChangeBy',
+          foreignField: '_id',
+          as: 'userData'
+        }
+      },
+      { $unwind: { path: '$userData', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          itemId: '$_id',
+          lastMovement: 1,
+          lastChange: 1,
+          lastChangeType: 1,
+          lastChangeBy: {
+            $ifNull: ['$userData.full_name', 'System']
+          },
+          totalChanges: 1,
+          avgChange: { $round: ['$avgChange', 2] },
+          totalIn: 1,
+          totalOut: 1,
+          trend: {
+            $switch: {
+              branches: [
+                { case: { $gt: ['$avgChange', 0] }, then: 'up' },
+                { case: { $lt: ['$avgChange', 0] }, then: 'down' }
+              ],
+              default: 'stable'
+            }
+          },
+          percentage: {
+            $min: [
+              { $multiply: [{ $abs: '$avgChange' }, 10] },
+              30 // Cap at 30%
+            ]
+          },
+          status: {
+            $let: {
+              vars: {
+                daysSinceLastMovement: {
+                  $divide: [
+                    { $subtract: [new Date(), '$lastMovement'] },
+                    1000 * 60 * 60 * 24 // Convert to days
+                  ]
+                }
+              },
+              in: {
+                $switch: {
+                  branches: [
+                    { 
+                      case: { $gt: ['$$daysSinceLastMovement', 30] },
+                      then: 'stagnant'
+                    },
+                    { 
+                      case: { 
+                        $and: [
+                          { $lt: ['$avgChange', 0] },
+                          { $gt: [{ $abs: '$avgChange' }, 1.5] }
+                        ]
+                      },
+                      then: 'depleting'
+                    }
+                  ],
+                  default: 'active'
+                }
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: itemsMovementData
+    });
+  } catch (error) {
+    console.error('Get items movement data error:', error);
+    
+    // More detailed error response
+    const errorResponse = {
+      success: false,
+      message: 'Error fetching items movement data',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      details: {
+        itemIds,
+        validItemIds: validItemIds ? validItemIds.map(id => id.toString()) : [],
+        invalidItemIds
+      }
+    };
+    
+    res.status(500).json(errorResponse);
+  }
+};
+
 module.exports = {
   getAllStockLogs,
   getStockLogById,
   createStockLog,
   getStockLogsByItem,
   getStockLogsByUser,
-  getStockSummary
-}; 
+  getStockSummary,
+  getItemsMovementData
+};

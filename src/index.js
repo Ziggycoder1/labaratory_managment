@@ -52,7 +52,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/labs', labRoutes);
 app.use('/api/fields', fieldRoutes);
 app.use('/api/lab-fields', labFieldRoutes);
-app.use('/api/stock', itemRoutes);
+app.use('/api/items', itemRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/borrow-logs', borrowLogRoutes);
 app.use('/api/stock-logs', stockLogRoutes);
