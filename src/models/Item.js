@@ -41,7 +41,7 @@ itemSchema.statics.findAll = async function({
   const soon = new Date();
   soon.setDate(soon.getDate() + 30);
   
-  if (lab_id) filter.lab = lab_id;
+  if (lab_id) filter.lab = new mongoose.Types.ObjectId(lab_id);
   if (type) filter.type = type;
   if (low_stock) filter.$expr = { $lte: ["$available_quantity", "$minimum_quantity"] };
   if (expiring_soon) {
@@ -55,7 +55,7 @@ itemSchema.statics.findAll = async function({
     .lean();
   // Alerts summary
   const [alerts] = await this.aggregate([
-    { $match: lab_id ? { lab: mongoose.Types.ObjectId(lab_id) } : {} },
+    { $match: lab_id ? { lab: new mongoose.Types.ObjectId(lab_id) } : {} },
     {
       $group: {
         _id: null,

@@ -10,6 +10,108 @@ const LAB_STATUS = {
   AVAILABLE: 'available'
 };
 
+// Define booking settings schema
+const bookingSettingsSchema = new Schema({
+  min_booking_duration: {
+    type: Number, // in minutes
+    default: 30,
+    min: [15, 'Minimum booking duration must be at least 15 minutes'],
+    max: [1440, 'Minimum booking duration cannot exceed 24 hours']
+  },
+  max_booking_duration: {
+    type: Number, // in minutes
+    default: 8 * 60, // 8 hours
+    min: [30, 'Maximum booking duration must be at least 30 minutes'],
+    max: [24 * 60, 'Maximum booking duration cannot exceed 24 hours']
+  },
+  slot_interval: {
+    type: Number, // in minutes
+    default: 15,
+    enum: {
+      values: [5, 10, 15, 20, 30, 60],
+      message: 'Slot interval must be one of: 5, 10, 15, 20, 30, 60 minutes'
+    }
+  },
+  max_days_in_advance: {
+    type: Number, // in days
+    default: 90,
+    min: [1, 'Maximum days in advance must be at least 1'],
+    max: [365, 'Maximum days in advance cannot exceed 1 year']
+  },
+  min_notice_minutes: {
+    type: Number, // in minutes
+    default: 120, // 2 hours
+    min: [0, 'Minimum notice cannot be negative'],
+    max: [7 * 24 * 60, 'Minimum notice cannot exceed 1 week']
+  },
+  allow_recurring: {
+    type: Boolean,
+    default: true
+  },
+  max_recurring_events: {
+    type: Number,
+    default: 10,
+    min: [1, 'Maximum recurring events must be at least 1'],
+    max: [100, 'Maximum recurring events cannot exceed 100']
+  },
+  require_approval: {
+    type: Boolean,
+    default: false
+  },
+  auto_approve: {
+    type: Boolean,
+    default: false
+  },
+  max_concurrent_bookings: {
+    type: Number,
+    default: 1,
+    min: [1, 'Maximum concurrent bookings must be at least 1']
+  },
+  allow_item_requests: {
+    type: Boolean,
+    default: true
+  },
+  item_request_deadline: {
+    type: Number, // in hours before booking
+    default: 24,
+    min: [1, 'Item request deadline must be at least 1 hour'],
+    max: [168, 'Item request deadline cannot exceed 1 week']
+  },
+  fields: [{
+    field: {
+      type: Schema.Types.ObjectId,
+      ref: 'Field',
+      required: true
+    },
+    is_active: {
+      type: Boolean,
+      default: true
+    },
+    max_capacity: {
+      type: Number,
+      min: [1, 'Field capacity must be at least 1']
+    },
+    requires_approval: {
+      type: Boolean,
+      default: false
+    },
+    allowed_user_roles: [{
+      type: String,
+      enum: ['admin', 'lab_manager', 'teacher', 'student', 'external']
+    }],
+    booking_restrictions: {
+      min_duration: Number, // in minutes
+      max_duration: Number, // in minutes
+      max_days_in_advance: Number, // in days
+      blackout_periods: [{
+        start_time: Date,
+        end_time: Date,
+        reason: String
+      }]
+    }
+  }]
+}, { _id: false });
+
 const labSchema = new Schema({
   name: { 
     type: String, 
@@ -95,6 +197,43 @@ const labSchema = new Schema({
     saturday: { open: String, close: String },
     sunday: { open: String, close: String }
   },
+  // Booking settings
+  booking_settings: {
+    type: bookingSettingsSchema,
+    default: () => ({})
+  },
+  
+  // Blackout periods for the entire lab
+  blackout_periods: [{
+    start_time: {
+      type: Date,
+      required: true
+    },
+    end_time: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function(value) {
+          return value > this.start_time;
+        },
+        message: 'End time must be after start time'
+      }
+    },
+    reason: {
+      type: String,
+      required: true
+    },
+    created_by: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    created_at: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  
   contact_person: {
     name: String,
     email: {

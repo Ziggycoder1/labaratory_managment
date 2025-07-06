@@ -291,10 +291,10 @@ exports.searchItems = async (req, res) => {
         
         if (name) query.name = { $regex: name, $options: 'i' };
         if (type) query.type = type;
-        if (lab_id) query.lab_id = lab_id;
+        if (lab_id) query.lab = new mongoose.Types.ObjectId(lab_id);
         
         if (low_stock === 'true') {
-            query.$expr = { $lte: ['$quantity', '$minimum_quantity'] };
+            query.$expr = { $lte: ['$available_quantity', '$minimum_quantity'] };
         }
         
         if (expiring_soon === 'true') {
@@ -303,7 +303,7 @@ exports.searchItems = async (req, res) => {
             query.expiry_date = { $lte: thirtyDaysFromNow, $gte: new Date() };
         }
         
-        const items = await Item.find(query).populate('lab_id', 'name');
+        const items = await Item.find(query).populate('lab', 'name');
         
         res.json({
             success: true,

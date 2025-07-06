@@ -1,12 +1,23 @@
 const User = require('../models/User');
-const Notification = require('../models/Notification');
+let Notification;
+
+try {
+  Notification = require('../models/Notification');
+} catch (err) {
+  console.warn('Notification model not found. Notifications will be logged only.');
+}
 
 // Save notification to DB
 const createNotification = async ({ user, type, title, message, data, priority = 'normal', action_url }) => {
   try {
-    await Notification.create({ user, type, title, message, data, priority, action_url });
+    if (Notification && typeof Notification.create === 'function') {
+      await Notification.create({ user, type, title, message, data, priority, action_url });
+    } else {
+      console.log('[Notification]', { type, title, message, user, data: JSON.stringify(data) });
+    }
   } catch (error) {
     console.error('Error creating notification:', error);
+    // Don't throw error to prevent blocking the main operation
   }
 };
 
