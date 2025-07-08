@@ -76,8 +76,13 @@ app.use(errorHandler);
 
 // Start scheduled jobs
 if (process.env.NODE_ENV !== 'test') {
+  // Start stock level checks
   const stockChecks = require('./jobs/stockChecks');
   stockChecks.start();
+  
+  // Start inventory cleanup jobs
+  const { scheduleInventoryCleanup } = require('./jobs/scheduledJobs');
+  scheduleInventoryCleanup();
 }
 
 // Connect to MongoDB and start server only if successful

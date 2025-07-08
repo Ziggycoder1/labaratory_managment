@@ -139,10 +139,18 @@ router.put('/:id/status',
 );
 
 // Cancel booking
-router.delete('/:id',
+router.patch('/:id/cancel',
   auth,
   param('id').isMongoId().withMessage('Booking ID must be a valid MongoDB ID'),
   bookingController.cancelBooking
+);
+
+// Complete booking (admin/lab_manager only)
+router.patch('/:id/complete',
+  auth,
+  checkRole(['admin', 'lab_manager']),
+  param('id').isMongoId().withMessage('Booking ID must be a valid MongoDB ID'),
+  bookingController.completeBooking
 );
 
 // Check lab availability
