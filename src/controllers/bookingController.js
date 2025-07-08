@@ -3,12 +3,14 @@ const Lab = require('../models/Lab');
 const Field = require('../models/Field');
 const User = require('../models/User');
 const Item = require('../models/Item');
+const StockLog = require('../models/StockLog');
 const { validationResult } = require('express-validator');
 const { 
   sendBookingNotificationToAdmin, 
   sendBookingStatusUpdate 
 } = require('../utils/notifications');
 const moment = require('moment-timezone');
+const mongoose = require('mongoose');
 const { Types: { ObjectId } } = require('mongoose');
 
 // Get all bookings with filters
@@ -443,13 +445,19 @@ const updateBookingStatus = async (req, res) => {
 
 // Approve booking (Lab Manager only)
 const approveBooking = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { notes } = req.body;
     const { id } = req.params;
     const admin_id = req.user.id;
 
-    const booking = await Booking.findById(id);
+    // Find and validate booking
+    const booking = await Booking.findById(id).session(session);
     if (!booking) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: 'Booking not found'
@@ -458,20 +466,97 @@ const approveBooking = async (req, res) => {
 
     // Check if booking is already approved or rejected
     if (booking.status !== 'pending') {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: `Booking is already ${booking.status}`
       });
     }
 
-    // Update booking with approval details
+    // Process item requirements
+    for (const req of booking.item_requirements) {
+      const item = await Item.findById(req.item).session(session);
+      if (!item) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: `Item ${req.item} not found`
+        });
+      }
+
+      // For consumable items, reduce available quantity
+      if (item.type === 'consumable') {
+        if (item.available_quantity < req.quantity_needed) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for item: ${item.name}`,
+            item: {
+              id: item._id,
+              name: item.name,
+              available: item.available_quantity,
+              required: req.quantity_needed
+            }
+          });
+        }
+
+        // Reduce available quantity
+        item.available_quantity -= req.quantity_needed;
+        
+        // Update item status if needed
+        if (item.available_quantity <= item.minimum_quantity) {
+          item.status = item.available_quantity === 0 ? 'out_of_stock' : 'low_stock';
+        }
+
+        await item.save({ session });
+
+        // Create stock log entry
+        const stockLog = new StockLog({
+          item: item._id,
+          user: admin_id,
+          lab: booking.lab,
+          change_quantity: -req.quantity_needed,
+          reason: 'Booking approved',
+          notes: `Booking ID: ${booking._id}`,
+          type: 'remove',
+          reference_id: booking._id
+        });
+        await stockLog.save({ session });
+      }
+      // For non-consumable items, ensure they're available and not in maintenance
+      else if (item.type === 'equipment') {
+        if (item.status === 'in_maintenance') {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            success: false,
+            message: `Cannot approve booking: ${item.name} is under maintenance`,
+            item: {
+              id: item._id,
+              name: item.name,
+              status: item.status
+            }
+          });
+        }
+        item.status = 'in_use';
+        await item.save({ session });
+      }
+    }
+
+    // Update booking status
     booking.status = 'approved';
     booking.approved_by = admin_id;
     booking.approved_at = new Date();
     booking.special_instructions = notes || booking.special_instructions;
     
-    await booking.save();
+    await booking.save({ session });
+    await session.commitTransaction();
+    session.endSession();
 
+    // Populate booking details for response
     const populatedBooking = await Booking.findById(id)
       .populate('lab', 'name code')
       .populate('field', 'name code')
@@ -490,6 +575,8 @@ const approveBooking = async (req, res) => {
       data: populatedBooking
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Approve booking error:', error);
     res.status(500).json({
       success: false,
@@ -498,23 +585,34 @@ const approveBooking = async (req, res) => {
     });
   }
 };
-
-// Reject booking (Lab Manager only)
 const rejectBooking = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { reason } = req.body;
     const { id } = req.params;
+    const { reason, notes } = req.body;
     const admin_id = req.user.id;
 
-    if (!reason) {
+    if (!reason || !reason.trim()) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: 'Rejection reason is required'
       });
     }
 
-    const booking = await Booking.findById(id);
+    // Find and validate booking
+    const booking = await Booking.findById(id)
+      .populate('lab', 'name code')
+      .populate('field', 'name code')
+      .populate('user', 'full_name email')
+      .session(session);
+
     if (!booking) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: 'Booking not found'
@@ -523,6 +621,8 @@ const rejectBooking = async (req, res) => {
 
     // Check if booking is already approved or rejected
     if (booking.status !== 'pending') {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: `Booking is already ${booking.status}`
@@ -530,18 +630,34 @@ const rejectBooking = async (req, res) => {
     }
 
     // Update booking with rejection details
-    booking.status = 'rejected';
-    booking.approved_by = admin_id;
-    booking.approved_at = new Date();
-    booking.rejection_reason = reason;
+    // Use set to mark fields as modified
+    booking.set({
+      status: 'rejected',
+      rejected_by: admin_id,
+      rejected_at: new Date(),
+      rejection_reason: reason,
+      special_instructions: notes || booking.special_instructions,
+      // Ensure required fields are not lost
+      title: booking.title || 'Lab Booking',
+      created_by: booking.created_by || admin_id,
+      // Ensure item requirements have required fields
+      item_requirements: (booking.item_requirements || []).map(item => ({
+        ...item.toObject(),
+        type: item.type || 'non_consumable', // Default type if missing
+        quantity_needed: item.quantity_needed || 1 // Default quantity if missing
+      }))
+    });
+    
+    await booking.save({ session });
+    await session.commitTransaction();
+    session.endSession();
 
-    await booking.save();
-
+    // Populate booking details for response
     const populatedBooking = await Booking.findById(id)
       .populate('lab', 'name code')
       .populate('field', 'name code')
       .populate('user', 'full_name email')
-      .populate('approved_by', 'full_name email')
+      .populate('rejected_by', 'full_name email')
       .populate('item_requirements.item', 'name type');
 
     // Send notification to user about rejection
@@ -551,10 +667,12 @@ const rejectBooking = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Booking rejected',
+      message: 'Booking rejected successfully',
       data: populatedBooking
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Reject booking error:', error);
     res.status(500).json({
       success: false,
