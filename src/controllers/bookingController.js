@@ -1,17 +1,22 @@
+const mongoose = require('mongoose');
+const { Types: { ObjectId } } = mongoose;
 const Booking = require('../models/Booking');
 const Lab = require('../models/Lab');
 const Field = require('../models/Field');
 const User = require('../models/User');
 const Item = require('../models/Item');
+const Notification = require('../models/Notification');
 const StockLog = require('../models/StockLog');
 const { validationResult } = require('express-validator');
 const { 
   sendBookingNotificationToAdmin, 
   sendBookingStatusUpdate 
 } = require('../utils/notifications');
+const { 
+  releaseBookingItems,
+  releaseCompletedBookings
+} = require('../utils/inventoryUtils');
 const moment = require('moment-timezone');
-const mongoose = require('mongoose');
-const { Types: { ObjectId } } = require('mongoose');
 
 // Get all bookings with filters
 const getAllBookings = async (req, res) => {
@@ -682,60 +687,147 @@ const rejectBooking = async (req, res) => {
   }
 };
 
-// Cancel booking
+// @desc    Cancel a booking
+// @route   PATCH /api/bookings/:id/cancel
+// @access  Private
 const cancelBooking = async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  const user_id = req.user.id;
+  
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid booking ID'
+    });
+  }
+  
+  const session = await mongoose.startSession();
+
   try {
-    const { id } = req.params;
-    const user_id = req.user.id;
+    await session.withTransaction(async () => {
+      // Find the booking with necessary fields populated
+      const booking = await Booking.findById(id)
+        .populate('user', '_id name email')
+        .populate('lab', 'name')
+        .session(session);
 
-    const booking = await Booking.findById(id);
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
+      if (!booking) {
+        throw new ErrorResponse('Booking not found', 404);
+      }
+
+      // Check if booking is already cancelled
+      if (booking.status === 'cancelled') {
+        throw new ErrorResponse('Booking is already cancelled', 400);
+      }
+
+      // Check if booking is already completed
+      if (booking.status === 'completed') {
+        throw new ErrorResponse('Cannot cancel a completed booking', 400);
+      }
+
+      // Check permissions - user can cancel their own booking, admin/lab_manager can cancel any
+      const isOwner = booking.user._id.toString() === req.user.id;
+      const isAdminOrLabManager = ['admin', 'lab_manager'].includes(req.user.role);
+
+      if (!isOwner && !isAdminOrLabManager) {
+        throw new ErrorResponse('Not authorized to cancel this booking', 403);
+      }
+
+      // Release any allocated items if booking was approved
+      if (booking.status === 'approved' && booking.item_requirements && booking.item_requirements.length > 0) {
+        console.log(`Releasing items for booking ${booking._id}`);
+        await releaseBookingItems(booking._id, req.user.id, 'booking_cancelled', session);
+        
+        // Save the booking to persist any changes made by releaseBookingItems
+        await booking.save({ session });
+        console.log(`Successfully saved booking after releasing items`);
+      }
+
+      // Update booking status and metadata
+      booking.status = 'cancelled';
+      booking.cancelled_at = new Date();
+      booking.cancelled_by = req.user.id;
+      booking.cancellation_reason = reason || 'No reason provided';
+      booking.updated_by = req.user.id;
+
+      await booking.save({ session });
+
+      // Create a notification for the booking user (if not the one cancelling)
+      if (booking.user._id.toString() !== req.user.id) {
+        const notification = new Notification({
+          user: booking.user._id,
+          title: 'Booking Cancelled',
+          message: `Your booking for ${booking.lab?.name || 'the lab'} has been cancelled by ${req.user.name || 'an administrator'}`,
+          type: 'booking_cancelled',
+          related_entity: {
+            type: 'booking',
+            id: booking._id,
+            name: `Booking #${booking.booking_number || booking._id.toString().slice(-6)}`
+          },
+          created_by: req.user.id
+        });
+
+        await notification.save({ session });
+
+        // Emit real-time notification if socket.io is available
+        if (req.io) {
+          req.io.to(`user_${booking.user._id}`).emit('notification', {
+            _id: notification._id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            is_read: notification.is_read,
+            created_at: notification.created_at
+          });
+        }
+      }
+
+      // Log the cancellation
+      console.log(`Booking ${booking._id} cancelled by user ${req.user.id}`);
+
+      // Send success response
+      res.status(200).json({
+        success: true,
+        message: 'Booking cancelled successfully',
+        data: {
+          bookingId: booking._id,
+          status: booking.status,
+          cancelledAt: booking.cancelled_at
+        }
       });
-    }
+    });
 
-    // Only allow cancellation if user owns the booking or is admin/lab_manager
-    if (booking.user.toString() !== user_id && !['admin', 'lab_manager'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only cancel your own bookings'
-      });
-    }
+  } catch (error) {
+    console.error('Error cancelling booking:', error);
 
-    // Check if booking can be cancelled (not too close to start time)
-    const now = new Date();
-    const timeUntilStart = booking.start_time - now;
-    const hoursUntilStart = timeUntilStart / (1000 * 60 * 60);
-
-    if (hoursUntilStart < 24 && !['admin', 'lab_manager'].includes(req.user.role)) {
+    // Handle known error types
+    if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
-        message: 'Bookings can only be cancelled at least 24 hours before start time'
+        message: 'Validation error',
+        error: error.message
       });
     }
 
-    booking.status = 'cancelled';
-    await booking.save();
+    // Handle custom error response
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message
+      });
+    }
 
-    const populatedBooking = await Booking.findById(id)
-      .populate('lab', 'name code')
-      .populate('field', 'name code')
-      .populate('user', 'full_name email');
-
-    res.json({
-      success: true,
-      message: 'Booking cancelled successfully',
-      data: populatedBooking
-    });
-  } catch (error) {
-    console.error('Cancel booking error:', error);
+    // Default error response
     res.status(500).json({
       success: false,
-      message: 'Error cancelling booking',
-      errors: [error.message]
+      message: 'Failed to cancel booking',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     });
+
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -1205,7 +1297,139 @@ const getAvailableTimeSlots = async (req, res) => {
   }
 };
 
+// @desc    Complete a booking and release items
+// @route   PATCH /api/bookings/:id/complete
+// @access  Private (Lab Manager/Admin)
+const completeBooking = async (req, res) => {
+  const { id } = req.params;
+  const user_id = req.user.id;
+  
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid booking ID'
+    });
+  }
+  
+  const session = await mongoose.startSession();
+  
+  try {
+    await session.withTransaction(async () => {
+      // Find the booking with necessary fields populated
+      const booking = await Booking.findById(id)
+        .populate('user', '_id name email')
+        .populate('lab', 'name')
+        .session(session);
+      
+      if (!booking) {
+        throw new ErrorResponse('Booking not found', 404);
+      }
+      
+      // Check if booking is already completed or cancelled
+      if (booking.status === 'completed') {
+        throw new ErrorResponse('Booking is already completed', 400);
+      }
+      
+      if (booking.status === 'cancelled') {
+        throw new ErrorResponse('Cannot complete a cancelled booking', 400);
+      }
+      
+      // Ensure booking is approved
+      if (booking.status !== 'approved') {
+        throw new ErrorResponse('Only approved bookings can be marked as completed', 400);
+      }
+      
+      // Release any allocated items
+      if (booking.item_requirements && booking.item_requirements.length > 0) {
+        await releaseBookingItems(booking._id, userId, 'booking_completed_manual', session);
+      }
+      
+      // Update booking status and metadata
+      booking.status = 'completed';
+      booking.completed_at = new Date();
+      booking.completed_by = userId;
+      booking.updated_by = userId;
+      
+      await booking.save({ session });
+      
+      // Create a notification for the booking user
+      const notification = new Notification({
+        user: booking.user._id,
+        title: 'Booking Completed',
+        message: `Your booking for ${booking.lab?.name || 'the lab'} has been marked as completed.`,
+        type: 'booking_completed',
+        related_entity: {
+          type: 'booking',
+          id: booking._id,
+          name: `Booking #${booking.booking_number || booking._id.toString().slice(-6)}`
+        },
+        created_by: userId
+      });
+      
+      await notification.save({ session });
+      
+      // Emit real-time notification if socket.io is available
+      if (req.io) {
+        req.io.to(`user_${booking.user._id}`).emit('notification', {
+          _id: notification._id,
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          is_read: notification.is_read,
+          created_at: notification.created_at
+        });
+      }
+      
+      // Log the completion
+      console.log(`Booking ${booking._id} marked as completed by user ${userId}`);
+      
+      // Send success response
+      res.status(200).json({
+        success: true,
+        message: 'Booking marked as completed successfully',
+        data: {
+          bookingId: booking._id,
+          status: booking.status,
+          completedAt: booking.completed_at
+        }
+      });
+    });
+    
+  } catch (error) {
+    console.error('Error completing booking:', error);
+    
+    // Handle known error types
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        error: error.message
+      });
+    }
+    
+    // Handle custom error response
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    // Default error response
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete booking',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+    });
+    
+  } finally {
+    await session.endSession();
+  }
+};
+
 module.exports = {
+  completeBooking,
   getAllBookings,
   getBookingById,
   createBooking,
