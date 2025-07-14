@@ -74,10 +74,13 @@ notificationSchema.statics.getUnreadCount = function(userId) {
   return this.countDocuments({ user: userId, is_read: false });
 };
 
+// Add the model to the schema
 const Notification = mongoose.model('Notification', notificationSchema);
 
-// Export constants
+// Export the model and constants
 module.exports = {
   Notification,
-  NOTIFICATION_TYPES
+  NOTIFICATION_TYPES,
+  // For backward compatibility
+  default: Notification
 };

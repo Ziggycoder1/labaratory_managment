@@ -1,4 +1,4 @@
-const Notification = require('../models/Notification');
+const { Notification, NOTIFICATION_TYPES } = require('../models/Notification');
 const User = require('../models/User');
 
 // GET /api/notifications
@@ -15,12 +15,31 @@ exports.getNotifications = async (req, res) => {
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(parseInt(limit))
+      .populate('related_item', 'name code')
+      .populate('related_lab', 'name code')
       .lean();
+
+    // Format the response to match frontend expectations
+    const formattedNotifications = notifications.map(notification => ({
+      id: notification._id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      is_read: notification.is_read,
+      created_at: notification.created_at,
+      data: notification.data,
+      action_url: notification.action_url,
+      related_item: notification.related_item,
+      related_lab: notification.related_lab,
+      priority: notification.priority
+    }));
+
     const unread_count = await Notification.countDocuments({ user: userId, is_read: false });
+    
     res.json({
       success: true,
       data: {
-        notifications,
+        notifications: formattedNotifications,
         pagination: {
           current_page: parseInt(page),
           total_pages: Math.ceil(totalCount / limit),
@@ -31,7 +50,12 @@ exports.getNotifications = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching notifications', error: error.message });
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching notifications', 
+      error: error.message 
+    });
   }
 };
 
@@ -58,10 +82,56 @@ exports.markAsRead = async (req, res) => {
 exports.markAllAsRead = async (req, res) => {
   try {
     const userId = req.user._id;
-    await Notification.updateMany({ user: userId, is_read: false }, { is_read: true });
-    res.json({ success: true, message: 'All notifications marked as read' });
+    await Notification.updateMany(
+      { user: userId, is_read: false },
+      { $set: { is_read: true } }
+    );
+    
+    // Get updated unread count
+    const unreadCount = await Notification.countDocuments({ 
+      user: userId, 
+      is_read: false 
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'All notifications marked as read',
+      data: {
+        unread_count: unreadCount
+      }
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error marking all as read', error: error.message });
+    console.error('Error marking all as read:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error marking notifications as read', 
+      error: error.message 
+    });
+  }
+};
+
+// GET /api/notifications/unread-count
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const count = await Notification.countDocuments({ 
+      user: userId, 
+      is_read: false 
+    });
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        count 
+      } 
+    });
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error getting unread count', 
+      error: error.message 
+    });
   }
 };
 

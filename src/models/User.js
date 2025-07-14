@@ -4,6 +4,11 @@ const { Schema } = mongoose;
 const userSchema = new Schema({
   full_name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, trim: true },
+  phone: { 
+    type: String, 
+    trim: true,
+    match: [/^[0-9\-\(\)\s+]+$/, 'Please enter a valid phone number']
+  },
   password: { type: String, required: true },
   role: { type: String, required: true, enum: ['admin', 'department_admin', 'lab_manager', 'teacher', 'student', 'external'] },
   department: { type: Schema.Types.ObjectId, ref: 'Department', required: true },

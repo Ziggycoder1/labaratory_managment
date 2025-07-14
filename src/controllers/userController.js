@@ -90,6 +90,7 @@ const getUserById = async (req, res) => {
         id: user._id,
         name: user.full_name,
         email: user.email,
+        phone: user.phone || null,
         role: user.role,
         department_id: user.department?._id,
         department: {
@@ -180,9 +181,11 @@ const createUser = async (req, res) => {
 
 // Update user
 const updateUser = async (req, res) => {
-  const { name, email, role, department_id, is_active } = req.body;
+  const { name, email, role, department_id, is_active, phone } = req.body;
   const userId = req.params.id;
+  
   try {
+    // Check if email is already taken by another user
     const existingUser = await User.findOne({ email, _id: { $ne: userId } });
     if (existingUser) {
       return res.status(400).json({
@@ -191,23 +194,52 @@ const updateUser = async (req, res) => {
         errors: []
       });
     }
-    await User.findByIdAndUpdate(userId, {
+    
+    // Prepare update data
+    const updateData = {
       full_name: name,
       email,
       role,
       department: department_id,
       is_active
-    });
+    };
+    
+    // Only include phone in update if it's provided
+    if (phone !== undefined) {
+      updateData.phone = phone.trim() || null; // Store null if phone is empty string
+    }
+    
+    // Perform the update
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password -reset_token -reset_token_expiry');
+    
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        errors: []
+      });
+    }
+    
+    // Return the updated user data
+    const userResponse = {
+      id: updatedUser._id,
+      name: updatedUser.full_name,
+      email: updatedUser.email,
+      phone: updatedUser.phone || '',
+      role: updatedUser.role,
+      department_id: updatedUser.department,
+      department: updatedUser.department,
+      is_active: updatedUser.is_active
+    };
+    
     res.json({
       success: true,
       message: 'User updated successfully',
-      data: {
-        id: userId,
-        name,
-        email,
-        role,
-        department_id
-      }
+      data: userResponse
     });
   } catch (error) {
     console.error('Update user error:', error);

@@ -9,7 +9,8 @@ const {
   logout,
   getCurrentUser,
   verifyToken,
-  refreshToken
+  refreshToken,
+  changePassword
 } = require('../controllers/authController');
 
 // Public routes
@@ -23,5 +24,6 @@ router.post('/refresh-token', refreshToken);
 // Protected routes
 router.post('/logout', auth, logout);
 router.get('/me', auth, getCurrentUser);
+router.post('/change-password', auth, changePassword);
 
 module.exports = router;
