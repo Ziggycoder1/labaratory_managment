@@ -3,11 +3,15 @@ const router = express.Router();
 const { auth, checkRole } = require('../middleware/auth.middleware');
 const { 
   getAllDepartments, 
+  getPublicDepartments,
   createDepartment, 
   getDepartmentById, 
   updateDepartment, 
   deleteDepartment 
 } = require('../controllers/departmentController');
+
+// Public endpoint - no authentication required
+router.get('/public', getPublicDepartments);
 
 // Get all departments
 router.get('/', auth, checkRole(['admin', 'lab_manager']), getAllDepartments);

@@ -188,8 +188,29 @@ const deleteDepartment = async (req, res) => {
   }
 };
 
+// Get all departments (public endpoint - no authentication required)
+const getPublicDepartments = async (req, res) => {
+  try {
+    // Only return basic department info (no sensitive data)
+    const departments = await Department.find({}, 'name code description')
+      .sort({ name: 1 });
+      
+    res.json({
+      success: true,
+      data: departments
+    });
+  } catch (error) {
+    console.error('Error fetching public departments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching departments'
+    });
+  }
+};
+
 module.exports = {
   getAllDepartments,
+  getPublicDepartments,
   createDepartment,
   getDepartmentById,
   updateDepartment,
