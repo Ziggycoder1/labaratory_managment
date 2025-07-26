@@ -49,6 +49,7 @@ const systemRoutes = require('./routes/systemRoutes');
 const permissionRoutes = require('./routes/permissionRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const catalogueRoutes = require('./routes/catalogueRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
@@ -69,6 +70,7 @@ app.use('/api/system', systemRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/catalogue', catalogueRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/files/reports', express.static(path.join(__dirname, '../reports')));
 

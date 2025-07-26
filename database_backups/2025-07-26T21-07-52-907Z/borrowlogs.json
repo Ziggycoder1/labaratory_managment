@@ -1,0 +1,38 @@
+[
+  {
+    "_id": "68710dac9db5f557b029824d",
+    "item": "686bb9bb7a18803c6d50e98e",
+    "user": "68571f3077111e109ac1d77c",
+    "lab": "686bb5127a18803c6d50e7c4",
+    "expected_return_date": "2025-07-18T00:00:00.000Z",
+    "status": "borrowed",
+    "fine_amount": 0,
+    "fine_paid": false,
+    "condition_before": "good",
+    "borrow_date": "2025-07-11T13:12:12.896Z",
+    "createdAt": "2025-07-11T13:12:12.897Z",
+    "updatedAt": "2025-07-12T08:53:20.328Z",
+    "__v": 0,
+    "approved_at": "2025-07-12T08:53:20.327Z",
+    "approved_by": "68571f3077111e109ac1d77c",
+    "notes": "Approved by Gilbert Byiringiro"
+  },
+  {
+    "_id": "687227151a3df095e9657101",
+    "item": "686bb9607a18803c6d50e984",
+    "user": "68571f3077111e109ac1d77c",
+    "lab": "686bb5127a18803c6d50e7c4",
+    "expected_return_date": "2025-07-19T00:00:00.000Z",
+    "status": "rejected",
+    "fine_amount": 0,
+    "fine_paid": false,
+    "condition_before": "good",
+    "borrow_date": "2025-07-12T09:12:53.969Z",
+    "createdAt": "2025-07-12T09:12:53.970Z",
+    "updatedAt": "2025-07-12T09:13:14.439Z",
+    "__v": 0,
+    "rejected_at": "2025-07-12T09:13:14.438Z",
+    "rejected_by": "68571f3077111e109ac1d77c",
+    "rejected_reason": "guijkfvld"
+  }
+]

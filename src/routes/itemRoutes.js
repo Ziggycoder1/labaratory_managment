@@ -34,6 +34,17 @@ const validateMoveItem = [
     body('notes').optional().isString()
 ];
 
+const validateTransferItem = [
+    body('item_id').isMongoId().withMessage('Valid item ID is required'),
+    body('from_lab_id').isMongoId().withMessage('Valid source lab ID is required'),
+    body('to_lab_id').isMongoId().withMessage('Valid target lab ID is required'),
+    body('from_storage_type').optional().isIn(['lab', 'temporary']).withMessage('Invalid source storage type'),
+    body('to_storage_type').optional().isIn(['lab', 'temporary']).withMessage('Invalid target storage type'),
+    body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive number'),
+    body('reason').optional().isString(),
+    body('notes').optional().isString()
+];
+
 // GET /api/items - Get all items with pagination and filters
 router.get('/',
     auth,
@@ -123,10 +134,18 @@ router.post('/:id/adjust',
     itemController.adjustStock
 );
 
-// POST /api/items/:id/move - Move item to another lab
+// POST /api/items/transfer - Transfer items between storage locations (lab to lab, lab to temp, etc.)
+router.post('/transfer',
+    auth,
+    checkRole(['admin', 'lab_manager', 'department_admin']),
+    validateTransferItem,
+    itemController.transferItem
+);
+
+// POST /api/items/:id/move - Move item between labs (legacy, consider using /transfer instead)
 router.post('/:id/move',
     auth,
-    checkRole(['admin', 'lab_manager']),
+    checkRole(['admin', 'lab_manager', 'department_admin']),
     param('id').isMongoId().withMessage('Invalid item ID'),
     validateMoveItem,
     itemController.moveItem

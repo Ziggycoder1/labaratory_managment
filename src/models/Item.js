@@ -2,22 +2,89 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const itemSchema = new Schema({
-  name: { type: String, required: true, trim: true },
-  type: { type: String, required: true, trim: true },
-  lab: { type: Schema.Types.ObjectId, ref: 'Lab', required: true },
-  quantity: { type: Number, required: true },
-  available_quantity: { type: Number, required: true },
-  unit: { type: String, required: true },
-  expiry_date: { type: Date },
-  minimum_quantity: { type: Number, required: true },
-  description: { type: String },
+  catalogue_item_id: { 
+    type: Schema.Types.ObjectId, 
+    ref: 'CatalogueItem', 
+    required: true 
+  },
+  lab: { 
+    type: Schema.Types.ObjectId, 
+    ref: 'Lab', 
+    required: true 
+  },
+  storage_type: {
+    type: String,
+    enum: ['lab', 'temporary'],
+    default: 'lab',
+    required: true
+  },
+  quantity: { 
+    type: Number, 
+    required: true,
+    min: 0
+  },
+  available_quantity: { 
+    type: Number, 
+    required: true,
+    min: 0
+  },
+  minimum_quantity: { 
+    type: Number, 
+    required: true,
+    min: 0
+  },
+  name: { 
+    type: String, 
+    required: true, 
+    trim: true 
+  },
+  type: { 
+    type: String, 
+    required: true, 
+    enum: ['consumable', 'non_consumable', 'fixed_asset']
+  },
+  unit: { 
+    type: String, 
+    required: true 
+  },
+  expiry_date: { 
+    type: Date 
+  },
+  description: { 
+    type: String 
+  },
   status: { 
     type: String, 
     enum: ['available', 'low_stock', 'out_of_stock', 'expired', 'in_maintenance'],
     default: 'available' 
   },
-  deleted_at: { type: Date, default: null },
-}, { timestamps: true });
+  created_by: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  deleted_at: { 
+    type: Date, 
+    default: null 
+  },
+  asset_details: {
+    serial_number: String,
+    purchase_date: Date,
+    warranty_expiry: Date,
+    last_maintenance_date: Date,
+    next_maintenance_date: Date,
+    condition: {
+      type: String,
+      enum: ['new', 'good', 'fair', 'poor', 'disposed'],
+      default: 'new'
+    },
+    notes: String
+  }
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
 // Static methods
 itemSchema.statics.findAll = async function({ 

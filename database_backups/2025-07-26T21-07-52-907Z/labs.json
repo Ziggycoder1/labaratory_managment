@@ -1,0 +1,774 @@
+[
+  {
+    "_id": "68571e693a3ac4fd3b7f6814",
+    "name": "dentistelab",
+    "code": "BLS",
+    "department": "6856e12b9a24cdd1df42b247",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 45,
+    "location": "Kigali Medical Center",
+    "description": "It's for teeth",
+    "fields": [
+      "685cfa22de3553586e3c0e75"
+    ],
+    "createdAt": "2025-06-21T21:04:41.615Z",
+    "updatedAt": "2025-06-28T11:24:44.951Z",
+    "__v": 1,
+    "deleted_at": "2025-06-28T11:24:44.950Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c"
+  },
+  {
+    "_id": "68571ee477111e109ac1d774",
+    "name": "dentistelab",
+    "code": "CLS",
+    "department": "6856e12b9a24cdd1df42b247",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 45,
+    "location": "Kigali Medical Center",
+    "description": "It's for teeth",
+    "fields": [],
+    "createdAt": "2025-06-21T21:06:44.012Z",
+    "updatedAt": "2025-06-28T11:24:24.181Z",
+    "__v": 0,
+    "deleted_at": "2025-06-28T11:24:24.178Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c"
+  },
+  {
+    "_id": "68592d355698fd40585e19cb",
+    "name": "dentistelab",
+    "code": "CLB",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 45,
+    "location": "Kigali Medical Center",
+    "description": "It's for teeth",
+    "fields": [],
+    "createdAt": "2025-06-23T10:32:21.795Z",
+    "updatedAt": "2025-06-28T11:09:24.567Z",
+    "__v": 0,
+    "deleted_at": "2025-06-28T11:09:24.564Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c"
+  },
+  {
+    "_id": "685fc4781cf889c78c9a4d4c",
+    "name": "Gilbert Byiringiroddd",
+    "code": "BLSS",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "jkjnde",
+    "fields": [],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "jhkhknf",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T11:09:01.883Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [],
+    "createdAt": "2025-06-28T10:31:21.010Z",
+    "updatedAt": "2025-06-28T11:09:01.887Z",
+    "__v": 0
+  },
+  {
+    "_id": "685fcac3f69d1f9fb6ce695b",
+    "name": "MainLab",
+    "code": "ML",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "main",
+    "fields": [],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "the goood",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T11:42:09.364Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [],
+    "createdAt": "2025-06-28T10:58:11.351Z",
+    "updatedAt": "2025-06-28T11:42:09.368Z",
+    "__v": 0
+  },
+  {
+    "_id": "685fd22d9e32e6e119521170",
+    "name": "Second Lab",
+    "code": "SL",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 12,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "this is second lab",
+    "fields": [],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "labs",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T12:19:14.989Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [],
+    "createdAt": "2025-06-28T11:29:49.658Z",
+    "updatedAt": "2025-06-28T12:19:14.991Z",
+    "__v": 0
+  },
+  {
+    "_id": "685fd555fbe06ddbd7c2839e",
+    "name": "MainLabs",
+    "code": "MLS",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "dufbn",
+    "fields": [],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "dhjjcd",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T11:46:52.558Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-06-28T11:43:16.798Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "685fd555fbe06ddbd7c2839f"
+      }
+    ],
+    "createdAt": "2025-06-28T11:43:17.188Z",
+    "updatedAt": "2025-06-28T11:46:52.561Z",
+    "__v": 0
+  },
+  {
+    "_id": "685fd65c97d719e9ac8d817e",
+    "name": "Gilbert Byiringiro Lab",
+    "code": "GBL",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "hffnjf",
+    "fields": [],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "jhgkjg",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T12:19:04.808Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-06-28T11:47:39.815Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "685fd65c97d719e9ac8d817f"
+      }
+    ],
+    "createdAt": "2025-06-28T11:47:40.198Z",
+    "updatedAt": "2025-06-28T12:19:04.810Z",
+    "__v": 0
+  },
+  {
+    "_id": "685fd761196fcbd5a318603e",
+    "name": "richard ziggyy",
+    "code": "LZ",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "hbn",
+    "fields": [],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "hfbg",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T12:19:21.438Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-06-28T11:52:01.105Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "685fd761196fcbd5a318603f"
+      }
+    ],
+    "createdAt": "2025-06-28T11:52:01.497Z",
+    "updatedAt": "2025-06-28T12:19:21.440Z",
+    "__v": 0
+  },
+  {
+    "_id": "685fd86db284c4baf9158515",
+    "name": "MainLab",
+    "code": "MM",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "building": "Main",
+    "floor": 1,
+    "room_number": "1",
+    "description": "ejjfbn",
+    "fields": [
+      "685eeffd03e790d97f5a5b18",
+      "685ef1cbb880c44c908007fb"
+    ],
+    "equipment": [],
+    "images": [],
+    "opening_hours": {
+      "monday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "tuesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "08:00",
+        "close": "17:00"
+      },
+      "friday": {
+        "open": "08:00",
+        "close": "17:00"
+      }
+    },
+    "contact_person": {
+      "name": "Gilbert Byiringiro",
+      "email": "julesbyiringiro5@gmail.com",
+      "phone": ""
+    },
+    "notes": "",
+    "created_by": null,
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-07-07T11:45:21.922Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-06-28T15:13:15.985Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "6860068cd44f5fd1a74d55b0"
+      }
+    ],
+    "createdAt": "2025-06-28T11:56:29.321Z",
+    "updatedAt": "2025-07-07T11:45:21.924Z",
+    "__v": 0
+  },
+  {
+    "_id": "685ff5141fd0d31049909b62",
+    "name": "Gakuru Pierre",
+    "code": "GP",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "description": "fewqrw",
+    "fields": [
+      "685eeffd03e790d97f5a5b18"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "fewfr",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-06-28T13:59:12.861Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-06-28T13:58:43.921Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "685ff5141fd0d31049909b63"
+      }
+    ],
+    "createdAt": "2025-06-28T13:58:44.537Z",
+    "updatedAt": "2025-06-28T13:59:12.864Z",
+    "__v": 0
+  },
+  {
+    "_id": "6868d41c738bc4fc1755be7c",
+    "name": "Micro Biology",
+    "code": "MCB",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 1,
+    "description": "thf",
+    "fields": [
+      "685eeffd03e790d97f5a5b18",
+      "685ef1cbb880c44c908007fb"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "gkmk",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-07-07T11:45:16.067Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-07-05T07:28:28.170Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "6868d41c738bc4fc1755be7d"
+      }
+    ],
+    "createdAt": "2025-07-05T07:28:28.563Z",
+    "updatedAt": "2025-07-07T11:45:16.070Z",
+    "__v": 0
+  },
+  {
+    "_id": "686a3186bdbf3c5652f0cb27",
+    "name": "Microbiology Lab",
+    "code": "MCL",
+    "department": "685ecd98092debcb2b5eea31",
+    "status": "inactive",
+    "is_active": false,
+    "capacity": 12,
+    "description": "this MCL",
+    "fields": [
+      "686a316bbdbf3c5652f0cb1b",
+      "686a317abdbf3c5652f0cb20"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "this",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": "2025-07-07T11:45:10.144Z",
+    "deleted_by": "68571f3077111e109ac1d77c",
+    "assigned_users": [
+      {
+        "user": "68600797d44f5fd1a74d5627",
+        "role": "manager",
+        "assigned_at": "2025-07-06T08:19:17.893Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "686a3186bdbf3c5652f0cb28"
+      }
+    ],
+    "booking_settings": {
+      "min_booking_duration": 30,
+      "max_booking_duration": 480,
+      "slot_interval": 15,
+      "max_days_in_advance": 90,
+      "min_notice_minutes": 120,
+      "allow_recurring": true,
+      "max_recurring_events": 10,
+      "require_approval": false,
+      "auto_approve": false,
+      "max_concurrent_bookings": 1,
+      "allow_item_requests": true,
+      "item_request_deadline": 24,
+      "fields": []
+    },
+    "blackout_periods": [],
+    "createdAt": "2025-07-06T08:19:18.267Z",
+    "updatedAt": "2025-07-07T11:45:10.146Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb3fd7a18803c6d50e74b",
+    "name": "Microbiology and Parasitology Lab",
+    "code": "MPL",
+    "department": "685ecd98092debcb2b5eea31",
+    "status": "active",
+    "is_active": true,
+    "capacity": 25,
+    "description": "Equipped for microbiological and parasitological analyses including culture, staining, and microscopic examination",
+    "fields": [
+      "686a317abdbf3c5652f0cb20",
+      "686bb3c47a18803c6d50e73f",
+      "686bb3d77a18803c6d50e744"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": null,
+    "deleted_by": null,
+    "assigned_users": [
+      {
+        "user": "68600797d44f5fd1a74d5627",
+        "role": "manager",
+        "assigned_at": "2025-07-07T11:48:13.181Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "686bb3fd7a18803c6d50e74c"
+      }
+    ],
+    "booking_settings": {
+      "min_booking_duration": 30,
+      "max_booking_duration": 480,
+      "slot_interval": 15,
+      "max_days_in_advance": 90,
+      "min_notice_minutes": 120,
+      "allow_recurring": true,
+      "max_recurring_events": 10,
+      "require_approval": false,
+      "auto_approve": false,
+      "max_concurrent_bookings": 1,
+      "allow_item_requests": true,
+      "item_request_deadline": 24,
+      "fields": []
+    },
+    "blackout_periods": [],
+    "createdAt": "2025-07-07T11:48:13.541Z",
+    "updatedAt": "2025-07-07T11:48:13.541Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb5127a18803c6d50e7c4",
+    "name": "Clinical Chemistry and Hematology Lab",
+    "code": "CCHL",
+    "department": "685ecd98092debcb2b5eea31",
+    "status": "active",
+    "is_active": true,
+    "capacity": 19,
+    "description": "Facility for clinical chemistry analyses, hematology, and blood banking",
+    "fields": [
+      "686bb4ea7a18803c6d50e7b3",
+      "686bb4fc7a18803c6d50e7b8",
+      "686bb50c7a18803c6d50e7bd"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": null,
+    "deleted_by": null,
+    "assigned_users": [
+      {
+        "user": "68600797d44f5fd1a74d5627",
+        "role": "manager",
+        "assigned_at": "2025-07-07T11:52:50.139Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "686bb5127a18803c6d50e7c5"
+      }
+    ],
+    "booking_settings": {
+      "min_booking_duration": 30,
+      "max_booking_duration": 480,
+      "slot_interval": 15,
+      "max_days_in_advance": 90,
+      "min_notice_minutes": 120,
+      "allow_recurring": true,
+      "max_recurring_events": 10,
+      "require_approval": false,
+      "auto_approve": false,
+      "max_concurrent_bookings": 1,
+      "allow_item_requests": true,
+      "item_request_deadline": 24,
+      "fields": []
+    },
+    "blackout_periods": [],
+    "createdAt": "2025-07-07T11:52:50.531Z",
+    "updatedAt": "2025-07-07T11:52:50.531Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb5937a18803c6d50e7ec",
+    "name": "Histotechnology Laboratory",
+    "code": "HLAB",
+    "department": "685ecd98092debcb2b5eea31",
+    "status": "active",
+    "is_active": true,
+    "capacity": 20,
+    "description": "Advanced research facility for molecular biology and genetic testing",
+    "fields": [
+      "686bb3d77a18803c6d50e744",
+      "686bb5867a18803c6d50e7e0",
+      "686bb58e7a18803c6d50e7e5"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "",
+    "created_by": null,
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": null,
+    "deleted_by": null,
+    "assigned_users": [],
+    "booking_settings": {
+      "min_booking_duration": 30,
+      "max_booking_duration": 480,
+      "slot_interval": 15,
+      "max_days_in_advance": 90,
+      "min_notice_minutes": 120,
+      "allow_recurring": true,
+      "max_recurring_events": 10,
+      "require_approval": false,
+      "auto_approve": false,
+      "max_concurrent_bookings": 1,
+      "allow_item_requests": true,
+      "item_request_deadline": 24,
+      "fields": []
+    },
+    "blackout_periods": [],
+    "createdAt": "2025-07-07T11:54:59.659Z",
+    "updatedAt": "2025-07-16T21:09:58.914Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb6207a18803c6d50e81e",
+    "name": "Dental Clinical Skills Laboratory",
+    "code": "DCSL",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "status": "active",
+    "is_active": true,
+    "capacity": 16,
+    "description": "Comprehensive dental training facility with simulation stations for clinical practice",
+    "fields": [
+      "686bb5ef7a18803c6d50e808",
+      "686bb5fd7a18803c6d50e80d",
+      "686bb60e7a18803c6d50e812",
+      "686bb6197a18803c6d50e817"
+    ],
+    "equipment": [],
+    "images": [],
+    "notes": "",
+    "created_by": "68571f3077111e109ac1d77c",
+    "updated_by": "68571f3077111e109ac1d77c",
+    "deleted_at": null,
+    "deleted_by": null,
+    "assigned_users": [
+      {
+        "user": "68592c615698fd40585e19c2",
+        "role": "manager",
+        "assigned_at": "2025-07-07T11:57:20.553Z",
+        "assigned_by": "68571f3077111e109ac1d77c",
+        "notes": "",
+        "_id": "686bb6207a18803c6d50e81f"
+      }
+    ],
+    "booking_settings": {
+      "min_booking_duration": 30,
+      "max_booking_duration": 480,
+      "slot_interval": 15,
+      "max_days_in_advance": 90,
+      "min_notice_minutes": 120,
+      "allow_recurring": true,
+      "max_recurring_events": 10,
+      "require_approval": false,
+      "auto_approve": false,
+      "max_concurrent_bookings": 1,
+      "allow_item_requests": true,
+      "item_request_deadline": 24,
+      "fields": []
+    },
+    "blackout_periods": [],
+    "createdAt": "2025-07-07T11:57:20.921Z",
+    "updatedAt": "2025-07-07T11:57:20.921Z",
+    "__v": 0
+  }
+]
