@@ -37,6 +37,12 @@ const catalogueItemSchema = new Schema({
     trim: true,
     unique: true
   },
+  code: {
+    type: String,
+    trim: true,
+    required: true,
+    unique: true
+  },
   description: {
     type: String,
     trim: true
@@ -50,6 +56,16 @@ const catalogueItemSchema = new Schema({
   category: {
     type: String,
     trim: true
+  },
+  unit: {
+    type: String,
+    trim: true,
+    required: true
+  },
+  min_quantity: {
+    type: Number,
+    min: 0,
+    default: 1
   },
   specifications: {
     type: specificationSchema,

@@ -8,27 +8,31 @@ const { auth, checkRole } = require('../middleware/auth.middleware');
 const validateCatalogueItem = [
     body('name').notEmpty().withMessage('Name is required'),
     body('description').optional().isString(),
-    body('type').isIn(['consumable', 'non_consumable', 'fixed']).withMessage('Invalid item type'),
+    body('type').isIn(['consumable', 'non_consumable', 'fixed_asset']).withMessage('Invalid item type'),
     body('category').optional().isString(),
-    body('specifications').optional().isObject(),
+    body('specifications').isObject().withMessage('Specifications must be an object'),
+    body('specifications.unit').notEmpty().withMessage('Unit is required'),
+    body('specifications.default_minimum_quantity').isInt({ min: 0 }).withMessage('Default minimum quantity must be a non-negative integer'),
     body('is_active').optional().isBoolean(),
-    body('minimum_quantity').optional().isInt({ min: 0 })
+    body('min_quantity').optional().isInt({ min: 0 })
 ];
 
 // Validation for fixed asset specific fields
 const validateFixedAssetFields = [
-    body('specifications.model_number').if(body('type').equals('fixed'))
+    body('specifications.model_number').if(body('type').equals('fixed_asset'))
         .notEmpty().withMessage('Model number is required for fixed assets'),
-    body('specifications.purchase_date').if(body('type').equals('fixed'))
-        .optional().isISO8601().withMessage('Invalid purchase date format'),
-    body('specifications.warranty_period').if(body('type').equals('fixed'))
-        .optional().isObject().withMessage('Warranty period should be an object')
+    body('specifications.manufacturer').if(body('type').equals('fixed_asset'))
+        .optional().isString(),
+    body('specifications.warranty_period').if(body('type').equals('fixed_asset'))
+        .isInt({ min: 0 }).withMessage('Warranty period must be a non-negative number (in months)'),
+    body('specifications.maintenance_interval').if(body('type').equals('fixed_asset'))
+        .isInt({ min: 1 }).withMessage('Maintenance interval must be a positive number (in days)')
 ];
 
 // GET /api/catalogue/items - Get all catalogue items with optional filters
 router.get('/items',
     auth,
-    query('type').optional().isIn(['consumable', 'non_consumable', 'fixed']),
+    query('type').optional().isIn(['consumable', 'non_consumable', 'fixed_asset']),
     query('category').optional().isString(),
     query('search').optional().isString(),
     query('page').optional().isInt({ min: 1 }),
@@ -63,7 +67,7 @@ router.put('/:id',
 // DELETE /api/catalogue/:id - Delete a catalogue item (soft delete)
 router.delete('/:id',
     auth,
-    checkRole(['admin']), // Only admin can delete catalogue items
+    checkRole(['admin']),
     param('id').isMongoId().withMessage('Invalid catalogue item ID'),
     catalogueController.deleteCatalogueItem
 );

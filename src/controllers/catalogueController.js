@@ -5,16 +5,23 @@ const { validationResult } = require('express-validator');
 // Create a new catalogue item
 exports.createCatalogueItem = async (req, res) => {
   try {
+    console.log('=== CREATE CATALOGUE ITEM REQUEST ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { name, description, type, category, specifications } = req.body;
+    console.log('Parsed fields:', { name, description, type, category });
+    console.log('Specifications:', specifications);
     
     // Check if item with same name exists
     const existingItem = await CatalogueItem.findOne({ name });
     if (existingItem) {
+      console.log('Item with this name already exists:', existingItem);
       return res.status(400).json({ 
         success: false, 
         message: 'A catalogue item with this name already exists' 
@@ -25,29 +32,40 @@ exports.createCatalogueItem = async (req, res) => {
       name,
       description,
       type,
+      code: req.body.code, // Include code from request
+      unit: req.body.unit, // Include unit from request
+      min_quantity: req.body.min_quantity, // Include min_quantity from request
       category,
       specifications: {
         ...specifications,
         // Ensure required fields are set based on type
-        unit: specifications.unit || 'unit',
-        default_minimum_quantity: specifications.default_minimum_quantity || 1
+        unit: specifications.unit || req.body.unit || 'unit',
+        default_minimum_quantity: specifications.default_minimum_quantity || req.body.min_quantity || 1
       },
       created_by: req.user.id
     });
 
+    console.log('Catalogue item to be saved:', catalogueItem);
     await catalogueItem.save();
     
+    console.log('Catalogue item created successfully:', catalogueItem);
     res.status(201).json({
       success: true,
       data: catalogueItem
     });
     
   } catch (error) {
-    console.error('Error creating catalogue item:', error);
+    console.error('Error creating catalogue item:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      keyValue: error.keyValue
+    });
     res.status(500).json({ 
       success: false, 
       message: 'Server error',
-      error: error.message 
+      error: error.message
     });
   }
 };
@@ -173,7 +191,7 @@ exports.updateCatalogueItem = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
     
-    const { name, description, type, category, specifications } = req.body;
+    const { name, description, type, category, specifications, code, unit, min_quantity } = req.body;
     
     // Check if another item with the same name exists
     const existingItem = await CatalogueItem.findOne({ 
@@ -188,21 +206,28 @@ exports.updateCatalogueItem = async (req, res) => {
       });
     }
     
+    const updateData = {
+      name,
+      description,
+      type,
+      code, // Include code from request
+      unit, // Include unit from request
+      min_quantity, // Include min_quantity from request
+      category,
+      specifications: {
+        ...specifications,
+        // Ensure required fields are set based on type
+        unit: specifications?.unit || unit || 'unit',
+        default_minimum_quantity: specifications?.default_minimum_quantity || min_quantity || 1
+      },
+      updated_at: Date.now()
+    };
+    
+    console.log('Updating catalogue item with data:', updateData);
+    
     const item = await CatalogueItem.findByIdAndUpdate(
       req.params.id,
-      {
-        name,
-        description,
-        type,
-        category,
-        specifications: {
-          ...specifications,
-          // Preserve required fields
-          unit: specifications.unit || 'unit',
-          default_minimum_quantity: specifications.default_minimum_quantity || 1
-        },
-        updated_at: Date.now()
-      },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
     
