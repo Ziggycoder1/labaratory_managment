@@ -6,8 +6,18 @@ const { auth, checkRole } = require('../middleware/auth.middleware');
 
 // Validation middleware
 const validateItem = [
-    body('name').notEmpty().withMessage('Name is required'),
-    body('type').isIn(['consumable', 'non_consumable', 'fixed']).withMessage('Invalid item type'),
+    body('name')
+        .if((value, { req }) => !req.body.catalogue_item_id)
+        .notEmpty()
+        .withMessage('Name is required when not using a catalogue item'),
+    body('type')
+        .if((value, { req }) => !req.body.catalogue_item_id)
+        .isIn(['consumable', 'non_consumable', 'fixed'])
+        .withMessage('Invalid item type'),
+    body('catalogue_item_id')
+        .optional()
+        .isMongoId()
+        .withMessage('Valid catalogue item ID is required'),
     body('lab').optional().isMongoId().withMessage('Valid lab ID is required'),
     body('quantity').isInt({ min: 0 }).withMessage('Quantity must be a positive number'),
     body('unit').optional().isString(),

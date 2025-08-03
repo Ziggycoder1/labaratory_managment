@@ -25,7 +25,7 @@ exports.getAllItems = async (req, res) => {
         } = req.query;
 
         let filterLabId = lab_id;
-        
+
         // Department admin: only items for labs in their department
         if (req.user && req.user.role === 'department_admin') {
             console.log('Department admin detected, filtering by department labs');
@@ -56,16 +56,27 @@ exports.getAllItems = async (req, res) => {
             limit: parseInt(limit)
         });
 
-        console.log('Found items:', {
-            count: result.items ? result.items.length : 0,
-            pagination: result.pagination
+        // Format the items to include catalogue details
+        const formattedItems = result.items.map(item => {
+            const itemObj = item.toObject();
+            
+            // If we have a populated catalogue_item_id, merge its fields
+            if (itemObj.catalogue_item_id) {
+                const { _id, __v, ...catalogueFields } = itemObj.catalogue_item_id;
+                return {
+                    ...itemObj,
+                    ...catalogueFields,
+                    catalogue_item_id: _id // Keep the ID reference
+                };
+            }
+            
+            return itemObj;
         });
 
         res.json({
             success: true,
-            data: result.items || [],
-            pagination: result.pagination,
-            alerts: result.alerts
+            data: formattedItems,
+            pagination: result.pagination
         });
     } catch (error) {
         console.error('Error fetching items:', error);
@@ -80,8 +91,11 @@ exports.getAllItems = async (req, res) => {
 // Get specific item details
 exports.getItemById = async (req, res) => {
     try {
-        const item = await Item.findByIdWithDetails(req.params.id);
-        
+        const item = await Item.findById(req.params.id)
+            .populate('catalogue_item_id')
+            .populate('lab', 'name code')
+            .populate('created_by', 'name email');
+
         if (!item) {
             return res.status(404).json({
                 success: false,
@@ -89,9 +103,27 @@ exports.getItemById = async (req, res) => {
             });
         }
 
+        // Format the item to include catalogue details
+        const itemObj = item.toObject();
+        
+        // If we have a populated catalogue_item_id, merge its fields
+        if (itemObj.catalogue_item_id) {
+            const { _id, __v, ...catalogueFields } = itemObj.catalogue_item_id;
+            const formattedItem = {
+                ...itemObj,
+                ...catalogueFields,
+                catalogue_item_id: _id // Keep the ID reference
+            };
+            
+            return res.json({
+                success: true,
+                data: formattedItem
+            });
+        }
+
         res.json({
             success: true,
-            data: item
+            data: itemObj
         });
     } catch (error) {
         console.error('Error fetching item:', error);
@@ -105,13 +137,21 @@ exports.getItemById = async (req, res) => {
 
 // Add new item
 exports.createItem = async (req, res) => {
+    console.log('=== ITEM CREATION REQUEST ===');
+    console.log('Headers:', {
+        'content-type': req.headers['content-type'],
+        'authorization': req.headers['authorization'] ? 'Bearer [token present]' : 'No token'
+    });
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+
     const session = await mongoose.startSession();
     session.startTransaction();
-    
+
     try {
         // Validate request
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
+            console.error('Validation errors:', errors.array());
             await session.abortTransaction();
             session.endSession();
             return res.status(400).json({
@@ -120,54 +160,68 @@ exports.createItem = async (req, res) => {
             });
         }
 
-        const { 
-            catalogue_item_id, 
-            lab, 
+        const {
+            catalogue_item_id,
+            lab,
             storage_type = 'lab',
             quantity,
-            ...itemData 
+            ...itemData
         } = req.body;
+
+        console.log('Parsed request data:', {
+            catalogue_item_id,
+            lab,
+            storage_type,
+            quantity,
+            additional_data: itemData
+        });
 
         // Validate required fields
         if (!catalogue_item_id || !lab || quantity === undefined) {
+            const errorMsg = 'Missing required fields: ' +
+                (!catalogue_item_id ? 'catalogue_item_id, ' : '') +
+                (!lab ? 'lab, ' : '') +
+                (quantity === undefined ? 'quantity' : '');
+
+            console.error('Validation error:', errorMsg);
             await session.abortTransaction();
             session.endSession();
             return res.status(400).json({
                 success: false,
-                message: 'catalogue_item_id, lab, and quantity are required',
-                fields: {
-                    catalogue_item_id: !catalogue_item_id ? 'Required' : undefined,
-                    lab: !lab ? 'Required' : undefined,
-                    quantity: quantity === undefined ? 'Required' : undefined
-                }
+                message: errorMsg
             });
         }
 
-        // Get catalogue item details
-        const CatalogueItem = require('../models/CatalogueItem');
+        // Get the catalogue item to ensure it exists
+        const CatalogueItem = mongoose.model('CatalogueItem');
         const catalogueItem = await CatalogueItem.findById(catalogue_item_id).session(session);
-        
+
         if (!catalogueItem) {
+            const errorMsg = `Catalogue item with ID ${catalogue_item_id} not found`;
+            console.error('Validation error:', errorMsg);
             await session.abortTransaction();
             session.endSession();
             return res.status(404).json({
                 success: false,
-                message: 'Catalogue item not found'
+                message: errorMsg
             });
         }
 
         // Check if lab exists
+        const Lab = mongoose.model('Lab');
         const labExists = await Lab.findById(lab).session(session);
         if (!labExists) {
+            const errorMsg = `Lab with ID ${lab} not found`;
+            console.error('Validation error:', errorMsg);
             await session.abortTransaction();
             session.endSession();
             return res.status(404).json({
                 success: false,
-                message: 'Lab not found'
+                message: errorMsg
             });
         }
 
-        // Check if item already exists in this location
+        // Check for existing item in the same location
         const existingItem = await Item.findOne({
             catalogue_item_id,
             lab,
@@ -175,70 +229,69 @@ exports.createItem = async (req, res) => {
             deleted_at: null
         }).session(session);
 
-        let result;
-        
+        let item;
+
         if (existingItem) {
             // Update existing item quantity
-            existingItem.quantity += parseInt(quantity, 10);
-            existingItem.available_quantity += parseInt(quantity, 10);
-            result = await existingItem.save({ session });
+            existingItem.quantity += Number(quantity);
+            existingItem.available_quantity += Number(quantity);
+            item = await existingItem.save({ session });
         } else {
-            // Create new item with catalogue item details
+            // Create new item
             const newItem = new Item({
-                ...catalogueItem.toObject(),
                 catalogue_item_id,
                 lab,
                 storage_type,
-                quantity: parseInt(quantity, 10),
-                available_quantity: parseInt(quantity, 10),
+                quantity: Number(quantity),
+                available_quantity: Number(quantity),
+                minimum_quantity: Number(itemData.minimum_quantity) || 1,
+                expiry_date: itemData.expiry_date,
+                status: 'available',
                 created_by: req.user._id,
-                ...itemData
+                asset_details: itemData.asset_details || {}
             });
-            
-            // Set minimum quantity from catalogue if not provided
-            if (!newItem.minimum_quantity && catalogueItem.specifications?.default_minimum_quantity) {
-                newItem.minimum_quantity = catalogueItem.specifications.default_minimum_quantity;
-            }
-            
-            result = await newItem.save({ session });
+
+            item = await newItem.save({ session });
         }
 
         // Create stock log
-        const StockLog = require('../models/StockLog');
+        const StockLog = mongoose.model('StockLog');
         await StockLog.create([{
-            item: result._id,
+            item: item._id,
             user: req.user._id,
             lab: lab,
-            change_quantity: parseInt(quantity, 10),
+            change_quantity: Number(quantity),
             reason: 'Initial stock',
             type: 'add',
             metadata: {
                 storage_type,
-                source: 'catalogue_import'
+                source: 'catalogue_import',
+                catalogue_item_id
             }
         }], { session });
 
         await session.commitTransaction();
         session.endSession();
-        
-        // Populate the response with useful data
-        const populatedItem = await Item.findById(result._id)
-            .populate('catalogue_item_id', 'name description type category')
+
+        // Populate the response with all necessary data
+        const populatedItem = await Item.findById(item._id)
+            .populate('catalogue_item_id')
             .populate('lab', 'name code')
             .populate('created_by', 'name email')
             .lean();
-        
+
+        console.log('Item created/updated successfully:', populatedItem);
+
         res.status(201).json({
             success: true,
-            message: 'Item created successfully',
             data: populatedItem
         });
-        
+
     } catch (error) {
+        console.error('Error in createItem:', error);
         await session.abortTransaction();
         session.endSession();
-        
-        console.error('Error creating item:', error);
+
         res.status(500).json({
             success: false,
             message: 'Error creating item',
@@ -359,10 +412,10 @@ exports.getAlerts = async (req, res) => {
 exports.searchItems = async (req, res) => {
     try {
         const { q, name, type, lab_id, low_stock, expiring_soon } = req.query;
-        
+
         // Build query
         const query = {};
-        
+
         if (q) {
             query.$or = [
                 { name: { $regex: q, $options: 'i' } },
@@ -370,23 +423,23 @@ exports.searchItems = async (req, res) => {
                 { code: { $regex: q, $options: 'i' } }
             ];
         }
-        
+
         if (name) query.name = { $regex: name, $options: 'i' };
         if (type) query.type = type;
         if (lab_id) query.lab = new mongoose.Types.ObjectId(lab_id);
-        
+
         if (low_stock === 'true') {
             query.$expr = { $lte: ['$available_quantity', '$minimum_quantity'] };
         }
-        
+
         if (expiring_soon === 'true') {
             const thirtyDaysFromNow = new Date();
             thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
             query.expiry_date = { $lte: thirtyDaysFromNow, $gte: new Date() };
         }
-        
+
         const items = await Item.find(query).populate('lab', 'name');
-        
+
         res.json({
             success: true,
             data: items
@@ -405,14 +458,14 @@ exports.searchItems = async (req, res) => {
 exports.getLowStockItems = async (req, res) => {
     try {
         const { lab_id } = req.query;
-        const query = { 
-            $expr: { $lte: ['$quantity', '$minimum_quantity'] } 
+        const query = {
+            $expr: { $lte: ['$quantity', '$minimum_quantity'] }
         };
-        
+
         if (lab_id) query.lab_id = lab_id;
-        
+
         const items = await Item.find(query).populate('lab_id', 'name');
-        
+
         res.json({
             success: true,
             data: items
@@ -432,21 +485,21 @@ exports.getExpiringItems = async (req, res) => {
     try {
         const { days = 30, lab_id } = req.query;
         const daysNum = parseInt(days);
-        
+
         const targetDate = new Date();
         targetDate.setDate(targetDate.getDate() + daysNum);
-        
+
         const query = {
-            expiry_date: { 
+            expiry_date: {
                 $lte: targetDate,
                 $gte: new Date()
             }
         };
-        
+
         if (lab_id) query.lab_id = lab_id;
-        
+
         const items = await Item.find(query).populate('lab_id', 'name');
-        
+
         res.json({
             success: true,
             data: items
@@ -465,21 +518,21 @@ exports.getExpiringItems = async (req, res) => {
 exports.softDeleteItem = async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // Soft delete by setting deleted_at
         const item = await Item.findByIdAndUpdate(
             id,
             { deleted_at: new Date() },
             { new: true }
         );
-        
+
         if (!item) {
             return res.status(404).json({
                 success: false,
                 message: 'Item not found'
             });
         }
-        
+
         res.json({
             success: true,
             message: 'Item moved to trash successfully',
@@ -499,19 +552,19 @@ exports.softDeleteItem = async (req, res) => {
 exports.permanentDeleteItem = async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // Permanently delete the item
         const item = await Item.findByIdAndDelete(id);
-        
+
         if (!item) {
             return res.status(404).json({
                 success: false,
                 message: 'Item not found'
             });
         }
-        
+
         // TODO: Consider deleting associated records (borrow logs, etc.)
-        
+
         res.json({
             success: true,
             message: 'Item permanently deleted successfully',
@@ -534,7 +587,7 @@ exports.deleteItem = exports.softDeleteItem;
 exports.updateItem = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-    
+
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -552,7 +605,7 @@ exports.updateItem = async (req, res) => {
         if (updates.quantity !== undefined && updates.quantity !== item.quantity) {
             const adjustmentType = updates.quantity > item.quantity ? 'add' : 'remove';
             const quantityChanged = Math.abs(updates.quantity - item.quantity);
-            
+
             // Create stock log
             await StockLog.create([{
                 item: item._id,
@@ -573,17 +626,16 @@ exports.updateItem = async (req, res) => {
         Object.assign(item, updates);
         item.updated_by = userId;
         item.updated_at = new Date();
-        
         await item.save({ session });
-        
+
         await session.commitTransaction();
         session.endSession();
-        
+
         res.json({
             message: 'Item updated successfully',
             data: item
         });
-        
+
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
@@ -605,11 +657,11 @@ exports.transferItem = async (req, res) => {
     session.startTransaction();
 
     try {
-        const { 
-            item_id, 
-            from_lab_id, 
-            to_lab_id, 
-            from_storage_type = 'lab', 
+        const {
+            item_id,
+            from_lab_id,
+            to_lab_id,
+            from_storage_type = 'lab',
             to_storage_type = 'lab',
             quantity,
             reason = 'transfer',
@@ -691,9 +743,9 @@ exports.transferItem = async (req, res) => {
 
         // Create or update destination item
         if (destinationItem) {
+            // Update existing item
             destinationItem.quantity += quantity;
             destinationItem.available_quantity += quantity;
-            destinationItem.updated_at = now;
         } else {
             // Create new item at destination using source item details
             const { _id, __v, updated_at, created_at, ...itemData } = sourceItem.toObject();
@@ -768,7 +820,7 @@ exports.transferItem = async (req, res) => {
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
-        
+
         console.error('Error transferring item:', error);
         res.status(500).json({
             success: false,
@@ -784,7 +836,7 @@ exports.transferItem = async (req, res) => {
 exports.moveItem = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-    
+
     try {
         const { target_lab_id, quantity, reason, notes } = req.body;
         const { id: itemId } = req.params;
@@ -813,7 +865,7 @@ exports.moveItem = async (req, res) => {
                 model: 'Lab'
             })
             .session(session);
-            
+
         if (!sourceItem) {
             await session.abortTransaction();
             session.endSession();
@@ -842,7 +894,7 @@ exports.moveItem = async (req, res) => {
                 department: sourceItem.lab.department
             }
         }, null, 2));
-            
+
         if (!sourceItem) {
             await session.abortTransaction();
             session.endSession();
@@ -861,13 +913,13 @@ exports.moveItem = async (req, res) => {
             })
             .select('name department')
             .session(session);
-            
+
         console.log('Target lab with department:', JSON.stringify({
             _id: targetLab?._id,
             name: targetLab?.name,
             department: targetLab?.department
         }, null, 2));
-            
+
         if (!targetLab) {
             await session.abortTransaction();
             session.endSession();
@@ -959,7 +1011,7 @@ exports.moveItem = async (req, res) => {
 
         // Log the movement
         const StockLog = require('../models/StockLog');
-        
+
         // Log source item decrease
         const sourceStockLog = new StockLog({
             item: sourceItem._id,
