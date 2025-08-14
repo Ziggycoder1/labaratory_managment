@@ -218,6 +218,9 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
 
   const notifications = [];
   const item = borrowLog.item;
+  // Normalize IDs whether borrowLog.item/lab are populated objects or raw ObjectIds
+  const itemId = (item && typeof item === 'object' && item._id) ? item._id : item;
+  const labId = (borrowLog.lab && typeof borrowLog.lab === 'object' && borrowLog.lab._id) ? borrowLog.lab._id : borrowLog.lab;
   const isOverdue = status === 'returned' && new Date() > borrowLog.expected_return_date;
 
   try {
@@ -231,14 +234,14 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
           title: 'Borrow Request Submitted',
           message: `Your request to borrow ${item?.name || 'an item'} has been submitted for approval`,
           data: {
-            item_id: borrowLog.item,
+            item_id: itemId,
             item_name: item?.name,
             request_date: borrowLog.created_at,
             expected_return_date: borrowLog.expected_return_date
           },
           action_url: `/my-borrowings/${borrowLog._id}`,
-          related_item: borrowLog.item,
-          related_lab: borrowLog.lab,
+          related_item: itemId,
+          related_lab: labId,
           priority: 'normal',
           session
         };
@@ -251,7 +254,7 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
           title: 'Borrow Request Approved',
           message: `Your request to borrow ${item?.name || 'an item'} has been approved`,
           data: {
-            item_id: borrowLog.item,
+            item_id: itemId,
             item_name: item?.name,
             approved_by: user._id,
             approved_at: new Date(),
@@ -259,8 +262,8 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
             borrow_id: borrowLog._id
           },
           action_url: `/my-borrowings/${borrowLog._id}`,
-          related_item: borrowLog.item,
-          related_lab: borrowLog.lab,
+          related_item: itemId,
+          related_lab: labId,
           priority: 'high',
           session
         };
@@ -273,7 +276,7 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
           title: 'Borrow Request Rejected',
           message: `Your borrow request has been rejected${reason ? `: ${reason}` : ''}`,
           data: {
-            item_id: borrowLog.item,
+            item_id: itemId,
             item_name: item?.name,
             rejected_by: user._id,
             rejected_at: new Date(),
@@ -281,8 +284,8 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
             request_date: borrowLog.created_at
           },
           action_url: `/my-borrowings/${borrowLog._id}`,
-          related_item: borrowLog.item,
-          related_lab: borrowLog.lab,
+          related_item: itemId,
+          related_lab: labId,
           priority: 'high',
           session
         };
@@ -295,7 +298,7 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
           title: 'Item Return Confirmed',
           message: `You have successfully returned ${item?.name || 'the item'}`,
           data: {
-            item_id: borrowLog.item,
+            item_id: itemId,
             item_name: item?.name,
             returned_at: new Date(),
             condition_after,
@@ -304,8 +307,8 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
             is_overdue: isOverdue ? 'Yes' : 'No'
           },
           action_url: `/my-borrowings/${borrowLog._id}`,
-          related_item: borrowLog.item,
-          related_lab: borrowLog.lab,
+          related_item: itemId,
+          related_lab: labId,
           priority: 'normal',
           session
         };
@@ -328,7 +331,7 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
             title: 'Borrow Request Approved',
             message: `You approved a borrow request for ${item?.name || 'an item'}`,
             data: {
-              item_id: borrowLog.item,
+              item_id: itemId,
               item_name: item?.name,
               requester_id: borrowLog.user,
               approved_at: new Date(),
@@ -336,8 +339,8 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
               borrow_id: borrowLog._id
             },
             action_url: `/borrow-requests/${borrowLog._id}`,
-            related_item: borrowLog.item,
-            related_lab: borrowLog.lab,
+            related_item: itemId,
+            related_lab: labId,
             priority: 'normal',
             session
           };
@@ -350,7 +353,7 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
             title: 'Borrow Request Rejected',
             message: `You rejected a borrow request for ${item?.name || 'an item'}`,
             data: {
-              item_id: borrowLog.item,
+              item_id: itemId,
               item_name: item?.name,
               requester_id: borrowLog.user,
               rejected_at: new Date(),
@@ -358,38 +361,33 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
               request_date: borrowLog.created_at
             },
             action_url: `/borrow-requests/${borrowLog._id}`,
-            related_item: borrowLog.item,
-            related_lab: borrowLog.lab,
+            related_item: itemId,
+            related_lab: labId,
             priority: 'normal',
             session
           };
           break;
 
         case 'returned':
-          if (condition_after !== 'excellent' || damage_notes) {
-            // Only notify about returns with issues
-            managerNotification = {
-              user: borrowLog.approved_by || user._id, // The admin who approved or the current user
-              type: 'item_returned_with_issues',
-              title: 'Item Returned with Issues',
-              message: `Item ${item?.name || ''} was returned with condition: ${condition_after}`,
-              data: {
-                item_id: borrowLog.item,
-                item_name: item?.name,
-                condition_after,
-                damage_notes,
-                returned_by: borrowLog.user,
-                returned_at: new Date(),
-                is_overdue: isOverdue ? 'Yes' : 'No',
-                fine_amount
-              },
-              action_url: `/borrow-logs/${borrowLog._id}`,
-              related_item: borrowLog.item,
-              related_lab: borrowLog.lab,
-              priority: 'high',
-              session
-            };
-          }
+          managerNotification = {
+            user: user._id,
+            type: 'item_return_recorded',
+            title: 'Item Return Recorded',
+            message: `You recorded a return for ${item?.name || 'an item'}`,
+            data: {
+              item_id: itemId,
+              item_name: item?.name,
+              requester_id: borrowLog.user,
+              damage_notes,
+              fine_amount,
+              returned_at: new Date(),
+            },
+            action_url: `/borrow-logs/${borrowLog._id}`,
+            related_item: itemId,
+            related_lab: labId,
+            priority: 'low',
+            session
+          };
           break;
       }
 
@@ -400,14 +398,8 @@ const sendBorrowStatusUpdate = async (borrowLog, user, status, options = {}) => 
 
     return notifications;
   } catch (error) {
-    console.error('Error in sendBorrowStatusUpdate:', {
-      error: error.message,
-      stack: error.stack,
-      borrowLogId: borrowLog?._id,
-      status,
-      userId: user?._id
-    });
-    return [];
+    console.error('Error sending borrow status update:', error);
+    return notifications;
   }
 };
 
