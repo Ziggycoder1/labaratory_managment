@@ -3,6 +3,7 @@ const Lab = require('../models/Lab');
 const Department = require('../models/Department');
 const Field = require('../models/Field');
 const { validationResult } = require('express-validator');
+const { sendLabNotification } = require('../utils/notifications');
 
 // Helper function to format lab response
 const formatLabResponse = (lab) => {
@@ -767,12 +768,13 @@ const createLab = async (req, res) => {
     const lab = await Lab.create([labData], { session });
     const createdLab = lab[0];
 
-    // Populate the response
-    const populatedLab = await Lab.findById(createdLab._id)
-      .populate('department', 'name code')
-      .populate('fields', 'name code')
-      .populate('created_by', 'name email')
-      .session(session);
+    // Send notification about lab creation
+    await sendLabNotification(
+      createdLab,
+      req.user,
+      'created',
+      { session }
+    );
 
     await session.commitTransaction();
     session.endSession();
@@ -780,7 +782,7 @@ const createLab = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Lab created successfully',
-      data: formatLabResponse(populatedLab)
+      data: formatLabResponse(createdLab)
     });
   } catch (error) {
     await session.abortTransaction();
@@ -993,6 +995,14 @@ const updateLab = async (req, res) => {
       });
     }
 
+    // Send notification about lab update
+    await sendLabNotification(
+      updatedLab,
+      req.user,
+      'updated',
+      { session }
+    );
+
     await session.commitTransaction();
     session.endSession();
 
@@ -1190,6 +1200,14 @@ const deleteLab = async (req, res) => {
       });
     }
 
+    // Send notification about lab deletion
+    await sendLabNotification(
+      deletedLab,
+      req.user,
+      'deleted',
+      { session }
+    );
+
     // TODO: Add logic to cancel/update any future bookings for this lab
 
     console.log('Committing transaction...');
@@ -1318,6 +1336,19 @@ const updateLabStatus = async (req, res) => {
         errors: []
       });
     }
+
+    // Send notification about status change
+    await sendLabNotification(
+      lab,
+      req.user,
+      'status_changed',
+      { 
+        oldStatus: lab.status,
+        newStatus: status,
+        notes,
+        session 
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();

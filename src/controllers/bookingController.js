@@ -10,7 +10,8 @@ const StockLog = require('../models/StockLog');
 const { validationResult } = require('express-validator');
 const { 
   sendBookingNotificationToAdmin, 
-  sendBookingStatusUpdate 
+  sendBookingStatusUpdate,
+  createNotification
 } = require('../utils/notifications');
 const { 
   releaseBookingItems,
@@ -18,7 +19,7 @@ const {
 } = require('../utils/inventoryUtils');
 const moment = require('moment-timezone');
 
-// Get all bookings with filters
+// Get all bookings with filters and role-based access
 const getAllBookings = async (req, res) => {
   try {
     const {
@@ -27,6 +28,7 @@ const getAllBookings = async (req, res) => {
     } = req.query;
     const filter = {};
 
+    // Apply filters from query parameters
     if (lab_id) filter.lab = lab_id;
     if (field_id) filter.field = field_id;
     if (user_id) filter.user = user_id;
@@ -40,11 +42,34 @@ const getAllBookings = async (req, res) => {
       if (end_date) filter.start_time.$lte = new Date(end_date);
     }
 
-    // Department admin: only bookings for labs in their department
-    if (req.user && req.user.role === 'department_admin') {
+    // Role-based filtering
+    const userRole = req.user?.role;
+    const userId = req.user?._id;
+
+    if (userRole === 'admin' || userRole === 'lab_manager') {
+      // Admins and lab managers can see all bookings
+      // No additional filtering needed
+    } else if (userRole === 'department_admin') {
+      // Department admins can only see bookings for labs in their department
       const labs = await Lab.find({ department: req.user.department._id }).select('_id');
       const labIds = labs.map(l => l._id);
       filter.lab = { $in: labIds };
+    } else if (userRole === 'teacher' || userRole === 'instructor') {
+      // Teachers can see their own bookings and bookings for their courses/fields
+      const userFields = await Field.find({ instructor: userId }).select('_id');
+      const fieldIds = userFields.map(f => f._id);
+      
+      // Show bookings for user's fields or bookings created by the user
+      filter.$or = [
+        { field: { $in: fieldIds } },
+        { user: userId }
+      ];
+    } else if (userRole === 'student' || userRole === 'external_user') {
+      // Students and external users can only see their own bookings
+      filter.user = userId;
+    } else {
+      // Default: only show user's own bookings
+      filter.user = userId;
     }
 
     const skip = (page - 1) * limit;
@@ -343,7 +368,14 @@ const createBooking = async (req, res) => {
 
       // Send notifications for recurring bookings
       for (const booking of populatedBookings) {
-        await sendBookingNotificationToAdmin(booking, req.user);
+        try {
+          console.log('Sending admin notification for recurring booking:', booking._id);
+          await sendBookingNotificationToAdmin(booking, req.user);
+          console.log('Successfully sent admin notification for booking:', booking._id);
+        } catch (error) {
+          console.error('Error sending admin notification for booking:', booking._id, error);
+          // Don't fail the whole operation if notification fails
+        }
       }
 
       res.status(201).json({
@@ -361,9 +393,39 @@ const createBooking = async (req, res) => {
         .populate('user', 'full_name email')
         .populate('item_requirements.item', 'name type');
 
-      // Send notifications in the background without awaiting
-      sendBookingNotificationToAdmin(populatedBooking, req.user)
-        .catch(err => console.error('Background notification error:', err));
+      // Send admin notification for the booking
+      try {
+        console.log('Sending admin notification for new booking:', populatedBooking._id);
+        await sendBookingNotificationToAdmin(populatedBooking, req.user);
+        console.log('Successfully sent admin notification for booking:', populatedBooking._id);
+      } catch (error) {
+        console.error('Error sending admin notification for booking:', populatedBooking._id, error);
+        // Don't fail the whole operation if notification fails
+      }
+      
+      // Also send a confirmation to the user
+      try {
+        console.log('Sending user confirmation for booking:', populatedBooking._id);
+        // Create a proper notification for booking request
+        await createNotification({
+          user: populatedBooking.user._id,
+          type: 'booking_requested',
+          title: 'Booking Request Submitted',
+          message: `Your booking for ${populatedBooking.lab?.name || 'a lab'} has been received and is pending approval.`,
+          data: { 
+            booking_id: populatedBooking._id, 
+            lab_name: populatedBooking.lab?.name, 
+            start_time: populatedBooking.start_time,
+            status: 'pending'
+          },
+          action_url: `/bookings/${populatedBooking._id}`,
+          related_lab: populatedBooking.lab?._id,
+          priority: 'normal'
+        });
+        console.log('Successfully sent user confirmation for booking:', populatedBooking._id);
+      } catch (error) {
+        console.error('Error sending user confirmation for booking:', populatedBooking._id, error);
+      }
 
       res.status(201).json({
         success: true,
@@ -429,8 +491,31 @@ const updateBookingStatus = async (req, res) => {
     }
 
     // Send notification to user about status update
-    if (sendBookingStatusUpdate) {
-      await sendBookingStatusUpdate(booking, booking.user, status, rejection_reason);
+    try {
+      console.log('Sending booking status update notification...');
+      console.log('Booking:', {
+        id: booking._id,
+        lab: booking.lab,
+        user: booking.user,
+        status: booking.status
+      });
+      
+      // Get the user who made the booking
+      const user = await User.findById(booking.user).lean();
+      if (!user) {
+        console.error('User not found for booking:', booking._id);
+      } else {
+        console.log('Found user for notification:', user._id, user.email);
+        if (sendBookingStatusUpdate) {
+          await sendBookingStatusUpdate(booking, user, status, rejection_reason);
+          console.log('Booking status update notification sent successfully');
+        } else {
+          console.error('sendBookingStatusUpdate function not available');
+        }
+      }
+    } catch (error) {
+      console.error('Error sending booking status notification:', error);
+      // Don't fail the whole request if notification fails
     }
 
     res.json({
@@ -450,16 +535,37 @@ const updateBookingStatus = async (req, res) => {
 
 // Approve booking (Lab Manager only)
 const approveBooking = async (req, res) => {
+  console.log('=== APPROVE BOOKING STARTED ===');
+  console.log('Request params:', req.params);
+  console.log('Request body:', req.body);
+  console.log('Authenticated user ID:', req.user?.id);
+
   const session = await mongoose.startSession();
   session.startTransaction();
-  
+
   try {
-    const { notes } = req.body;
     const { id } = req.params;
+    const { notes } = req.body;
     const admin_id = req.user.id;
 
+    console.log('Approving booking with ID:', id);
+    console.log('Admin ID:', admin_id);
+
+    if (!admin_id) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Admin ID is missing'
+      });
+    }
+
     // Find and validate booking
-    const booking = await Booking.findById(id).session(session);
+    const booking = await Booking.findById(id)
+      .populate('lab', 'name code')
+      .populate('user', 'full_name email')
+      .session(session);
+
     if (!booking) {
       await session.abortTransaction();
       session.endSession();
@@ -469,85 +575,93 @@ const approveBooking = async (req, res) => {
       });
     }
 
-    // Check if booking is already approved or rejected
-    if (booking.status !== 'pending') {
+    console.log('Found booking:', {
+      id: booking._id,
+      status: booking.status,
+      lab: booking.lab,
+      user: booking.user,
+      item_requirements: booking.item_requirements
+    });
+
+    // Check if booking is already approved
+    if (booking.status === 'approved') {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
         success: false,
-        message: `Booking is already ${booking.status}`
+        message: 'Booking is already approved'
       });
     }
 
     // Process item requirements
-    for (const req of booking.item_requirements) {
-      const item = await Item.findById(req.item).session(session);
-      if (!item) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: `Item ${req.item} not found`
-        });
-      }
-
-      // For consumable items, reduce available quantity
-      if (item.type === 'consumable') {
-        if (item.available_quantity < req.quantity_needed) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for item: ${item.name}`,
-            item: {
-              id: item._id,
-              name: item.name,
-              available: item.available_quantity,
-              required: req.quantity_needed
-            }
-          });
-        }
-
-        // Reduce available quantity
-        item.available_quantity -= req.quantity_needed;
+    if (booking.item_requirements && booking.item_requirements.length > 0) {
+      const Item = mongoose.model('Item');
+      
+      for (const requirement of booking.item_requirements) {
+        const item = await Item.findById(requirement.item).session(session);
         
-        // Update item status if needed
-        if (item.available_quantity <= item.minimum_quantity) {
-          item.status = item.available_quantity === 0 ? 'out_of_stock' : 'low_stock';
-        }
-
-        await item.save({ session });
-
-        // Create stock log entry
-        const stockLog = new StockLog({
-          item: item._id,
-          user: admin_id,
-          lab: booking.lab,
-          change_quantity: -req.quantity_needed,
-          reason: 'Booking approved',
-          notes: `Booking ID: ${booking._id}`,
-          type: 'remove',
-          reference_id: booking._id
-        });
-        await stockLog.save({ session });
-      }
-      // For non-consumable items, ensure they're available and not in maintenance
-      else if (item.type === 'equipment') {
-        if (item.status === 'in_maintenance') {
+        if (!item) {
           await session.abortTransaction();
           session.endSession();
-          return res.status(400).json({
+          return res.status(404).json({
             success: false,
-            message: `Cannot approve booking: ${item.name} is under maintenance`,
-            item: {
-              id: item._id,
-              name: item.name,
-              status: item.status
-            }
+            message: `Item ${requirement.item} not found`
           });
         }
-        item.status = 'in_use';
-        await item.save({ session });
+
+        // For consumable items, check availability and update quantity
+        if (item.type === 'consumable') {
+          if (item.available_quantity < requirement.quantity_needed) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient quantity for item ${item.name}. Available: ${item.available_quantity}, Required: ${requirement.quantity_needed}`
+            });
+          }
+
+          // Update item quantity and ensure created_by is set
+          item.available_quantity -= requirement.quantity_needed;
+          if (!item.created_by) {
+            item.created_by = admin_id;
+          }
+          
+          try {
+            await item.save({ session });
+          } catch (error) {
+            console.error('Error saving item:', error);
+            throw error;
+          }
+        }
+        // For non-consumable items, ensure they're available and not in maintenance
+        else if (item.type === 'equipment') {
+          if (item.status === 'in_maintenance') {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({
+              success: false,
+              message: `Cannot approve booking: ${item.name} is under maintenance`
+            });
+          }
+          
+          // Update item status and ensure created_by is set
+          item.status = 'in_use';
+          if (!item.created_by) {
+            item.created_by = admin_id;
+          }
+          
+          try {
+            await item.save({ session });
+          } catch (error) {
+            console.error('Error saving item:', error);
+            throw error;
+          }
+        }
+        
+        // Update requirement status
+        requirement.status = 'approved';
+        requirement.approved_by = admin_id;
+        requirement.approved_at = new Date();
       }
     }
 
@@ -555,23 +669,30 @@ const approveBooking = async (req, res) => {
     booking.status = 'approved';
     booking.approved_by = admin_id;
     booking.approved_at = new Date();
-    booking.special_instructions = notes || booking.special_instructions;
-    
-    await booking.save({ session });
+    booking.notes = notes || '';
+
+    // Save the updated booking
+    const updatedBooking = await booking.save({ session });
     await session.commitTransaction();
     session.endSession();
 
-    // Populate booking details for response
-    const populatedBooking = await Booking.findById(id)
+    // Populate the updated booking for the response
+    const populatedBooking = await Booking.findById(updatedBooking._id)
       .populate('lab', 'name code')
-      .populate('field', 'name code')
       .populate('user', 'full_name email')
-      .populate('approved_by', 'full_name email')
-      .populate('item_requirements.item', 'name type');
+      .populate('approved_by', 'full_name')
+      .populate('item_requirements.item', 'name type available_quantity');
 
     // Send notification to user about approval
     if (sendBookingStatusUpdate) {
-      await sendBookingStatusUpdate(populatedBooking, populatedBooking.user, 'approved');
+      await sendBookingStatusUpdate(
+        populatedBooking, 
+        populatedBooking.user, 
+        'approved',
+        null, // rejectionReason
+        populatedBooking.lab?._id, // related_lab
+        admin_id // Pass the admin's ID who approved the booking
+      );
     }
 
     res.json({
@@ -582,14 +703,27 @@ const approveBooking = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
+    
     console.error('Approve booking error:', error);
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error approving booking',
-      errors: [error.message]
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     });
   }
 };
+
 const rejectBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -755,32 +889,21 @@ const cancelBooking = async (req, res) => {
 
       // Create a notification for the booking user (if not the one cancelling)
       if (booking.user._id.toString() !== req.user.id) {
-        const notification = new Notification({
+        await createNotification({
           user: booking.user._id,
+          type: 'booking_cancelled',
           title: 'Booking Cancelled',
           message: `Your booking for ${booking.lab?.name || 'the lab'} has been cancelled by ${req.user.name || 'an administrator'}`,
-          type: 'booking_cancelled',
-          related_entity: {
-            type: 'booking',
-            id: booking._id,
-            name: `Booking #${booking.booking_number || booking._id.toString().slice(-6)}`
+          data: {
+            booking_id: booking._id,
+            lab_name: booking.lab?.name,
+            cancelled_by: req.user.id,
+            cancellation_reason: reason || 'No reason provided'
           },
-          created_by: req.user.id
+          action_url: `/bookings/${booking._id}`,
+          related_lab: booking.lab?._id,
+          priority: 'high'
         });
-
-        await notification.save({ session });
-
-        // Emit real-time notification if socket.io is available
-        if (req.io) {
-          req.io.to(`user_${booking.user._id}`).emit('notification', {
-            _id: notification._id,
-            title: notification.title,
-            message: notification.message,
-            type: notification.type,
-            is_read: notification.is_read,
-            created_at: notification.created_at
-          });
-        }
       }
 
       // Log the cancellation
@@ -865,7 +988,18 @@ const checkLabAvailability = async (req, res) => {
       lab: lab_id,
       status: { $in: ['pending', 'approved'] },
       $or: [
-        { start_time: { $lt: endDate }, end_time: { $gt: startDate } }
+        {
+          // Bookings that start or end on the target date
+          $or: [
+            { start_time: { $lt: endDate }, end_time: { $gt: startDate } },
+            { end_time: { $gt: startDate }, start_time: { $lt: endDate } },
+            { 
+              // Multi-day bookings that span the target date
+              start_time: { $lte: startDate },
+              end_time: { $gte: endDate }
+            }
+          ]
+        }
       ]
     };
 
@@ -1342,8 +1476,12 @@ const completeBooking = async (req, res) => {
       // Release any allocated items
       if (booking.item_requirements && booking.item_requirements.length > 0) {
         await releaseBookingItems(booking._id, userId, 'booking_completed_manual', session);
+        
+        // Save the booking to persist any changes made by releaseBookingItems
+        await booking.save({ session });
+        console.log(`Successfully saved booking after releasing items`);
       }
-      
+
       // Update booking status and metadata
       booking.status = 'completed';
       booking.completed_at = new Date();
@@ -1351,7 +1489,7 @@ const completeBooking = async (req, res) => {
       booking.updated_by = userId;
       
       await booking.save({ session });
-      
+
       // Create a notification for the booking user
       const notification = new Notification({
         user: booking.user._id,
@@ -1365,9 +1503,9 @@ const completeBooking = async (req, res) => {
         },
         created_by: userId
       });
-      
+
       await notification.save({ session });
-      
+
       // Emit real-time notification if socket.io is available
       if (req.io) {
         req.io.to(`user_${booking.user._id}`).emit('notification', {
@@ -1379,10 +1517,10 @@ const completeBooking = async (req, res) => {
           created_at: notification.created_at
         });
       }
-      
+
       // Log the completion
       console.log(`Booking ${booking._id} marked as completed by user ${userId}`);
-      
+
       // Send success response
       res.status(200).json({
         success: true,
@@ -1394,10 +1532,10 @@ const completeBooking = async (req, res) => {
         }
       });
     });
-    
+
   } catch (error) {
     console.error('Error completing booking:', error);
-    
+
     // Handle known error types
     if (error.name === 'ValidationError') {
       return res.status(400).json({
@@ -1406,7 +1544,7 @@ const completeBooking = async (req, res) => {
         error: error.message
       });
     }
-    
+
     // Handle custom error response
     if (error.statusCode) {
       return res.status(error.statusCode).json({
@@ -1414,7 +1552,7 @@ const completeBooking = async (req, res) => {
         message: error.message
       });
     }
-    
+
     // Default error response
     res.status(500).json({
       success: false,
@@ -1422,7 +1560,7 @@ const completeBooking = async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
       ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
     });
-    
+
   } finally {
     await session.endSession();
   }

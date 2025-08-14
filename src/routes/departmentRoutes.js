@@ -13,11 +13,11 @@ const {
 // Public endpoint - no authentication required
 router.get('/public', getPublicDepartments);
 
-// Get all departments
-router.get('/', auth, checkRole(['admin', 'lab_manager']), getAllDepartments);
+// Get all departments (available to all authenticated users)
+router.get('/', auth, getAllDepartments);
 
-// Get single department
-router.get('/:id', auth, checkRole(['admin', 'lab_manager']), getDepartmentById);
+// Get single department (available to all authenticated users)
+router.get('/:id', auth, getDepartmentById);
 
 // Create new department
 router.post('/', auth, checkRole(['admin']), createDepartment);

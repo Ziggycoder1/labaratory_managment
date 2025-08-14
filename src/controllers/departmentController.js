@@ -1,6 +1,8 @@
+const mongoose = require('mongoose');
 const Department = require('../models/Department');
 const Lab = require('../models/Lab');
 const User = require('../models/User');
+const { sendDepartmentNotification } = require('../utils/notifications');
 
 // Get all departments with labs_count and users_count
 const getAllDepartments = async (req, res) => {
@@ -51,20 +53,68 @@ const getAllDepartments = async (req, res) => {
 
 // Create new department
 const createDepartment = async (req, res) => {
-  const { name, code, description } = req.body;
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const department = await Department.create({ name, code, description });
+    const { name, code, description, head_of_department, contact_email, contact_phone } = req.body;
+
+    // Check if department with same name or code already exists
+    const existingDept = await Department.findOne({
+      $or: [
+        { name: { $regex: new RegExp(`^${name}$`, 'i') } },
+        { code: { $regex: new RegExp(`^${code}$`, 'i') } }
+      ]
+    }).session(session);
+
+    if (existingDept) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Department with this name or code already exists'
+      });
+    }
+
+    // Create new department
+    const department = new Department({
+      name,
+      code: code.toUpperCase(),
+      description,
+      head_of_department,
+      contact_email,
+      contact_phone,
+      created_by: req.user.id,
+      updated_by: req.user.id
+    });
+
+    await department.save({ session });
+
+    // Send notification about department creation
+    await sendDepartmentNotification(
+      department,
+      req.user,
+      'created',
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(201).json({
       success: true,
       message: 'Department created successfully',
       data: department
     });
   } catch (error) {
-    console.error('Error creating department:', error);
+    await session.abortTransaction();
+    console.error('Create department error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error creating department'
+      message: 'Error creating department',
+      error: error.message
     });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -93,98 +143,161 @@ const getDepartmentById = async (req, res) => {
 
 // Update department
 const updateDepartment = async (req, res) => {
-  const { name, code, description } = req.body;
-  try {
-    console.log('Updating department with ID:', req.params.id);
-    console.log('Update data:', { name, code, description });
-    
-    const department = await Department.findByIdAndUpdate(
-      req.params.id,
-      { name, code, description },
-      { new: true, runValidators: true }
-    );
-
-    if (!department) {
-      console.log('Department not found with ID:', req.params.id);
-      return res.status(404).json({
-        status: 'error',
-        message: 'Department not found',
-        success: false
-      });
-    }
-
-    console.log('Department updated successfully:', department);
-    res.json({
-      status: 'success',
-      message: 'Department updated successfully',
-      success: true,
-      data: department
-    });
-  } catch (error) {
-    console.error('Error updating department:', error);
-    res.status(500).json({
-      status: 'error',
-      success: false,
-      message: 'Error updating department',
-      error: error.message
-    });
-  }
-};
-
-// Delete department
-const deleteDepartment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { id } = req.params;
-    console.log('Attempting to delete department with ID:', id);
-    
-    // Check if department exists
-    const department = await Department.findById(id);
+    const { name, code, description, head_of_department, contact_email, contact_phone, is_active } = req.body;
+
+    // Find the department
+    const department = await Department.findById(id).session(session);
     if (!department) {
-      console.log('Department not found with ID:', id);
+      await session.abortTransaction();
       return res.status(404).json({
-        status: 'error',
         success: false,
         message: 'Department not found'
       });
     }
 
-    // Check if department has associated labs or users
-    const [labsCount, usersCount] = await Promise.all([
-      Lab.countDocuments({ department: id }),
-      User.countDocuments({ department: id })
-    ]);
-
-    if (labsCount > 0 || usersCount > 0) {
-      console.log(`Cannot delete department: ${labsCount} labs and ${usersCount} users are associated`);
-      return res.status(400).json({
-        status: 'error',
-        success: false,
-        message: 'Cannot delete department with associated labs or users',
-        data: {
-          hasLabs: labsCount > 0,
-          hasUsers: usersCount > 0
+    // Check for duplicate name or code if being updated
+    if (name || code) {
+      const query = {
+        _id: { $ne: id },
+        $or: []
+      };
+      
+      if (name) query.$or.push({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+      if (code) query.$or.push({ code: { $regex: new RegExp(`^${code}$`, 'i') } });
+      
+      if (query.$or.length > 0) {
+        const existingDept = await Department.findOne(query).session(session);
+        if (existingDept) {
+          await session.abortTransaction();
+          return res.status(400).json({
+            success: false,
+            message: 'Another department with this name or code already exists'
+          });
         }
+      }
+    }
+
+    // Update department fields
+    if (name) department.name = name;
+    if (code) department.code = code.toUpperCase();
+    if (description !== undefined) department.description = description;
+    if (head_of_department !== undefined) department.head_of_department = head_of_department;
+    if (contact_email !== undefined) department.contact_email = contact_email;
+    if (contact_phone !== undefined) department.contact_phone = contact_phone;
+    if (is_active !== undefined) department.is_active = is_active;
+    
+    department.updated_by = req.user.id;
+    department.updated_at = new Date();
+
+    await department.save({ session });
+
+    // Send notification about department update
+    await sendDepartmentNotification(
+      department,
+      req.user,
+      'updated',
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Department updated successfully',
+      data: department
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Update department error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating department',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// Delete department
+const deleteDepartment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const { id } = req.params;
+
+    // Find the department
+    const department = await Department.findById(id).session(session);
+    if (!department) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Department not found'
       });
     }
 
+    // Check if department has associated labs
+    const labCount = await Lab.countDocuments({ department: id, is_deleted: false }).session(session);
+    if (labCount > 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete department with associated labs. Please reassign or delete the labs first.'
+      });
+    }
+
+    // Check if department has associated users
+    const userCount = await User.countDocuments({ department: id, status: 'active' }).session(session);
+    if (userCount > 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete department with associated users. Please reassign or deactivate the users first.'
+      });
+    }
+
+    // Store department data for notification before deletion
+    const departmentData = {
+      _id: department._id,
+      name: department.name,
+      code: department.code
+    };
+
     // Delete the department
-    await Department.findByIdAndDelete(id);
-    console.log('Department deleted successfully:', id);
+    await Department.findByIdAndDelete(id).session(session);
+
+    // Send notification about department deletion
+    await sendDepartmentNotification(
+      departmentData,
+      req.user,
+      'deleted',
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({
-      status: 'success',
       success: true,
-      message: 'Department deleted successfully',
-      data: { id }
+      message: 'Department deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting department:', error);
+    await session.abortTransaction();
+    console.error('Delete department error:', error);
     res.status(500).json({
-      status: 'error',
       success: false,
       message: 'Error deleting department',
       error: error.message
     });
+  } finally {
+    session.endSession();
   }
 };
 

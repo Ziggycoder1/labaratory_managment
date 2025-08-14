@@ -6,9 +6,9 @@ const Lab = require('../models/Lab');
 const StockLog = require('../models/StockLog');
 const { validationResult } = require('express-validator');
 const { calculateFine } = require('../utils/fineCalculator');
-const { createNotification } = require('../utils/notifications');
+const { createNotification, sendBorrowStatusUpdate } = require('../utils/notifications');
 
-// Get all borrow logs with filters and role-based access control
+// Get all borrow logs with unified role-based access control
 const getAllBorrowLogs = async (req, res) => {
   try {
     const { item_id, user_id, lab_id, status, page = 1, limit = 20 } = req.query;
@@ -17,51 +17,70 @@ const getAllBorrowLogs = async (req, res) => {
     // Always filter by item_id if provided
     if (item_id) filter.item = item_id;
     
-    // Apply user filter based on role
-    if (user_id) {
-      filter.user = user_id;
-    } else if (['student', 'external'].includes(req.user.role)) {
-      // Students and external users can only see their own requests
-      filter.user = req.user.id;
+    // Apply role-based filtering
+    switch (req.user.role) {
+      case 'admin':
+        // Admins can see all borrow logs
+        if (user_id) filter.user = user_id;
+        break;
+        
+      case 'lab_manager':
+      case 'department_admin':
+        // Lab managers and department admins can see logs from their labs
+        const labs = req.user.managed_labs || [];
+        if (req.user.role === 'department_admin' && req.user.department) {
+          // For department admins, get all labs in their department
+          const departmentLabs = await Lab.find({ department: req.user.department }).select('_id');
+          departmentLabs.forEach(lab => {
+            if (!labs.includes(lab._id)) labs.push(lab._id);
+          });
+        }
+        
+        if (labs.length > 0) {
+          filter.lab = { $in: labs };
+          // If user_id is provided, further filter by user
+          if (user_id) filter.user = user_id;
+        } else {
+          // No accessible labs, return empty result
+          return res.json({
+            success: true,
+            data: {
+              borrowLogs: [],
+              pagination: {
+                current_page: parseInt(page),
+                total_pages: 0,
+                total_count: 0,
+                per_page: parseInt(limit)
+              }
+            }
+          });
+        }
+        break;
+        
+      case 'teacher':
+      case 'student':
+      case 'external':
+      default:
+        // Regular users can only see their own borrow logs
+        filter.user = req.user.id;
+        break;
     }
     
-    // Filter by lab if provided
+    // Additional filters
     if (lab_id) filter.lab = lab_id;
-    
-    // Filter by status if provided
     if (status) filter.status = status;
     
-    // For department_admin, only show borrow logs from labs in their department
-    if (req.user.role === 'department_admin' && req.user.department) {
-      // Find all labs in the department
-      const labs = await Lab.find({ department: req.user.department }).select('_id');
-      const labIds = labs.map(lab => lab._id);
-      
-      // If no labs in department, return empty result
-      if (labIds.length === 0) {
-        return res.json({
-          success: true,
-          data: {
-            borrowLogs: [],
-            pagination: {
-              current_page: parseInt(page),
-              total_pages: 0,
-              total_count: 0,
-              per_page: parseInt(limit)
-            }
-          }
-        });
-      }
-      
-      // Add lab filter to only show logs from labs in the department
-      filter.lab = { $in: labIds };
-    }
-    
-    // For admin and lab manager, if no results with current filters, show all requests
+    // For admins and lab managers, if no results with current filters, show all accessible requests
     let totalCount = await BorrowLog.countDocuments(filter);
-    if (totalCount === 0 && ['admin', 'lab_manager'].includes(req.user.role)) {
-      delete filter.user; // Remove user filter to show all requests
-      totalCount = await BorrowLog.countDocuments(filter);
+    if (totalCount === 0 && ['admin', 'lab_manager', 'department_admin'].includes(req.user.role)) {
+      // Remove user filter but keep other filters (like lab filters)
+      const { user, ...otherFilters } = filter;
+      totalCount = await BorrowLog.countDocuments(otherFilters);
+      
+      // If we found results without the user filter, update the filter
+      if (totalCount > 0) {
+        Object.assign(filter, otherFilters);
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -155,29 +174,25 @@ const borrowItem = async (req, res) => {
     }
 
     // Check if item is available for borrowing
-    if (item.quantity_available <= 0) {
+    if (item.status !== 'available' && item.available_quantity <= 0) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Item is currently not available for borrowing'
+        message: 'Item is not available for borrowing'
       });
     }
 
-    // Check if user has any overdue items
-    const hasOverdue = await BorrowLog.findOne({
-      user: user_id,
-      status: 'overdue'
-    }).session(session);
-
-    if (hasOverdue) {
+    // Check if lab exists
+    const lab = await Lab.findById(lab_id).session(session);
+    if (!lab) {
       await session.abortTransaction();
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        message: 'You have overdue items. Please return them before borrowing more.'
+        message: 'Lab not found'
       });
     }
 
-    // Create borrow request
+    // Create borrow log
     const borrowLog = new BorrowLog({
       item: item_id,
       user: user_id,
@@ -190,40 +205,18 @@ const borrowItem = async (req, res) => {
 
     await borrowLog.save({ session });
 
-    // Create notification for lab manager
-    await createNotification({
-      user: req.user.id,
-      type: 'borrow_request',
-      title: 'New Borrow Request',
-      message: `New borrow request for ${item.name} from ${req.user.full_name}`,
-      data: {
-        item_id: item._id,
-        item_name: item.name,
-        expected_return_date: expected_return_date,
-        request_date: new Date()
+    // Send notification to requester and lab managers
+    await sendBorrowStatusUpdate(
+      {
+        ...borrowLog.toObject(),
+        item: { _id: item._id, name: item.name },
+        lab: lab._id,
+        user: user_id
       },
-      action_url: `/borrow-requests/${borrowLog._id}`
-    });
-
-    // Notify all lab managers
-    const labManagers = await User.find({ role: 'lab_manager' });
-    for (const manager of labManagers) {
-      await createNotification({
-        user: manager._id,
-        type: 'borrow_request_received',
-        title: 'New Borrow Request',
-        message: `New borrow request for ${item.name} from ${req.user.full_name}`,
-        data: {
-          item_id: item._id,
-          item_name: item.name,
-          requester_id: req.user.id,
-          requester_name: req.user.full_name,
-          expected_return_date: expected_return_date
-        },
-        priority: 'high',
-        action_url: `/borrow-requests/${borrowLog._id}`
-      });
-    }
+      req.user,
+      'pending',
+      { session }
+    );
 
     await session.commitTransaction();
     session.endSession();
@@ -254,134 +247,175 @@ const approveBorrowRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
-    
-    const borrowLog = await BorrowLog.findById(id).session(session);
-    
+
+    // 1. Input validation
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid borrow request ID',
+      });
+    }
+
+    console.log(`Approving borrow request ${id} by user ${req.user.id}`);
+
+    // 2. Find the borrow log with item and user populated
+    const borrowLog = await BorrowLog.findById(id)
+      .populate('item')
+      .populate('user', 'name email')
+      .session(session);
+
     if (!borrowLog) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
-        message: 'Borrow request not found'
+        message: 'Borrow request not found',
       });
     }
 
+    // 3. Check current status
     if (borrowLog.status !== 'pending') {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'This request has already been processed'
+        message: `Borrow request is already ${borrowLog.status}`,
       });
     }
 
-    // Check item availability again
-    const item = await Item.findById(borrowLog.item).session(session);
-    if (item.quantity_available <= 0) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Item is no longer available for borrowing'
-      });
-    }
+    const item = borrowLog.item;
+    const isConsumable = item.item_type === 'consumable';
 
-    // Check if item is consumable or non-consumable
-    const isConsumable = item.type === 'consumable';
-    
-    // For non-consumable items, we just need to check availability
-    // For consumable items, we need to reduce the available quantity
+    console.log(`Processing ${isConsumable ? 'consumable' : 'non-consumable'} item:`, {
+      itemId: item._id,
+      currentQuantity: item.quantity_available,
+      isConsumable,
+    });
+
+    // 4. Handle item quantity update if consumable
     if (isConsumable) {
-      if (item.available_quantity < 1) {
+      if (item.quantity_available < 1) {
         await session.abortTransaction();
         return res.status(400).json({
           success: false,
-          message: 'Insufficient stock available for this item'
+          message: 'Insufficient stock available for this item',
         });
       }
+
+      // Update item quantity
+      item.quantity_available -= 1;
       
-      // Reduce available quantity for consumables
-      item.available_quantity -= 1;
-      await item.save({ session });
-      
-      // Create stock log for the reduction
+      try {
+        await item.save({ session });
+        console.log('Item quantity updated successfully');
+      } catch (itemError) {
+        console.error('Error updating item quantity:', itemError);
+        await session.abortTransaction();
+        return res.status(500).json({
+          success: false,
+          message: 'Error updating item quantity',
+          error: itemError.message,
+        });
+      }
+
+      // Create stock log
       const stockLog = new StockLog({
         item: item._id,
         user: req.user.id,
         lab: borrowLog.lab,
         change_quantity: -1,
         reason: 'borrow_approved',
-        notes: `Item borrowed by user ${borrowLog.user}`,
-        type: 'remove',
-        reference_id: borrowLog._id
-      });
-      
-      await stockLog.save({ session });
-    } else {
-      // For non-consumable items, just check if it's available
-      if (item.available_quantity < 1) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: 'This item is currently not available for borrowing'
-        });
-      }
-      
-      // Reduce available quantity for non-consumable items
-      item.available_quantity -= 1;
-      await item.save({ session });
-      
-      // Create stock log for the reduction
-      const stockLog = new StockLog({
-        item: item._id,
-        user: req.user.id,
-        lab: borrowLog.lab,
-        change_quantity: -1,
-        reason: 'borrow_approved',
-        notes: `Item borrowed by user ${borrowLog.user}`,
+        notes: `Item borrowed by user ${borrowLog.user._id} (${borrowLog.user.name || 'Unknown'})`,
         type: 'adjustment',
-        reference_id: borrowLog._id
+        reference_id: borrowLog._id,
+        created_by: req.user.id,
+        updated_by: req.user.id,
       });
-      
-      await stockLog.save({ session });
+
+      try {
+        await stockLog.save({ session });
+        console.log('Stock log created successfully');
+      } catch (stockLogError) {
+        console.error('Error creating stock log:', stockLogError);
+        await session.abortTransaction();
+        return res.status(500).json({
+          success: false,
+          message: 'Error creating stock log',
+          error: stockLogError.message,
+        });
+      }
     }
 
-    // Update borrow log
+    // 5. Update borrow log status
     borrowLog.status = 'borrowed';
     borrowLog.approved_by = req.user.id;
     borrowLog.approved_at = new Date();
     borrowLog.notes = notes || borrowLog.notes;
-    
-    await borrowLog.save({ session });
 
-    // Create notification for requester
-    await createNotification({
-      user: borrowLog.user,
-      type: 'borrow_approved',
-      title: 'Borrow Request Approved',
-      message: `Your request to borrow ${item.name} has been approved`,
-      data: {
-        item_id: item._id,
-        item_name: item.name,
-        approved_by: req.user.id,
-        approved_at: new Date(),
-        expected_return_date: borrowLog.expected_return_date
-      },
-      action_url: `/borrow-requests/${borrowLog._id}`
-    });
+    try {
+      await borrowLog.save({ session });
+      console.log('Borrow log updated successfully');
+    } catch (borrowLogError) {
+      console.error('Error updating borrow log:', borrowLogError);
+      await session.abortTransaction();
+      return res.status(500).json({
+        success: false,
+        message: 'Error updating borrow request',
+        error: borrowLogError.message,
+      });
+    }
 
+    // 6. Create notification
+    try {
+      await createNotification({
+        user: borrowLog.user._id,
+        type: 'borrow_approved',
+        title: 'Borrow Request Approved',
+        message: `Your request to borrow ${item.name} has been approved`,
+        data: {
+          item_id: item._id,
+          item_name: item.name,
+          approved_by: req.user.id,
+          approved_at: new Date(),
+          expected_return_date: borrowLog.expected_return_date,
+          borrow_id: borrowLog._id,
+        },
+        action_url: `/borrow-requests/${borrowLog._id}`,
+        related_item: item._id,
+        related_lab: borrowLog.lab,
+        priority: 'high',
+        session,
+      });
+      console.log('Notification created successfully');
+    } catch (notificationError) {
+      // Don't fail the entire operation if notification fails
+      console.error('Error creating notification:', notificationError);
+    }
+
+    // 7. Commit the transaction
     await session.commitTransaction();
-    session.endSession();
+    console.log('Borrow approval completed successfully');
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Borrow request approved successfully',
-      data: borrowLog
+      data: borrowLog,
     });
   } catch (error) {
+    console.error('Error in approveBorrowRequest:', {
+      error: error.message,
+      stack: error.stack,
+      request: {
+        params: req.params,
+        body: req.body,
+        user: req.user ? { id: req.user.id, role: req.user.role } : 'no user',
+      },
+    });
+
     await session.abortTransaction();
-    console.error('Approve borrow request error:', error);
-    res.status(500).json({
+    
+    return res.status(500).json({
       success: false,
       message: 'Error approving borrow request',
-      errors: [error.message]
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
     });
   } finally {
     session.endSession();
@@ -476,13 +510,26 @@ const returnItem = async (req, res) => {
     const { id } = req.params;
     const { condition_after, damage_notes } = req.body;
     
-    const borrowLog = await BorrowLog.findById(id).session(session);
+    // Input validation
+    if (!condition_after) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide the condition of the returned item',
+      });
+    }
+    
+    // Find the borrow log with item and user populated
+    const borrowLog = await BorrowLog.findById(id)
+      .populate('item')
+      .populate('user', 'name email')
+      .session(session);
     
     if (!borrowLog) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
-        message: 'Borrow record not found'
+        message: 'Borrow record not found',
       });
     }
 
@@ -490,20 +537,14 @@ const returnItem = async (req, res) => {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'This item is not currently borrowed'
+        message: 'This item is not currently borrowed',
       });
     }
 
     // Get item to update quantity
-    const item = await Item.findById(borrowLog.item).session(session);
-    if (!item) {
-      await session.abortTransaction();
-      return res.status(404).json({
-        success: false,
-        message: 'Item not found'
-      });
-    }
-    
+    const item = borrowLog.item;
+    const isConsumable = item.item_type === 'consumable';
+
     // Calculate fine if overdue
     let fineAmount = 0;
     const isOverdue = new Date() > borrowLog.expected_return_date;
@@ -517,18 +558,19 @@ const returnItem = async (req, res) => {
     borrowLog.status = 'returned';
     borrowLog.actual_return_date = new Date();
     borrowLog.condition_after = condition_after;
-    borrowLog.damage_notes = damage_notes;
+    borrowLog.damage_notes = damage_notes || '';
     borrowLog.fine_amount = fineAmount;
     borrowLog.fine_paid = fineAmount === 0; // Mark as paid if no fine
+    borrowLog.returned_by = req.user.id;
     
     await borrowLog.save({ session });
 
     // Handle stock updates based on item type
-    const isConsumable = item.type === 'consumable';
-    
     if (!isConsumable) {
       // For non-consumable items, increase available quantity
-      item.available_quantity += 1;
+      item.quantity_available += 1;
+      
+      // Save the updated item
       await item.save({ session });
       
       // Create stock log for the return
@@ -538,77 +580,68 @@ const returnItem = async (req, res) => {
         lab: borrowLog.lab,
         change_quantity: 1,
         reason: 'item_returned',
-        notes: `Item returned by user ${borrowLog.user}. Condition: ${condition_after}`,
+        notes: `Item returned by user ${borrowLog.user._id} (${borrowLog.user.name || 'Unknown'}). Condition: ${condition_after}`,
         type: 'adjustment',
         reference_id: borrowLog._id,
+        created_by: req.user.id,
+        updated_by: req.user.id,
         metadata: {
           condition_after,
-          has_damage: condition_after !== 'excellent' || !!damage_notes ? 'yes' : 'no',
+          has_damage: (condition_after !== 'excellent' || damage_notes) ? 'yes' : 'no',
           is_overdue: isOverdue ? 'yes' : 'no'
         }
       });
       
       await stockLog.save({ session });
     }
-    // For consumable items, we don't return them to stock
 
-    // Create notification for lab manager if there's damage or if item is non-consumable and was returned
-    if (condition_after !== 'excellent' || damage_notes) {
-      await createNotification({
-        user: borrowLog.approved_by, // Notify the lab manager who approved
-        type: 'item_returned',
-        title: 'Item Returned with Issues',
-        message: `Item ${item.name} was returned with condition: ${condition_after}. Please check the details.`,
-        data: {
-          item_id: item._id,
-          item_name: item.name,
-          condition_after,
-          damage_notes,
-          returned_by: req.user.id,
-          returned_at: new Date(),
-          is_overdue: isOverdue,
-          fine_amount: fineAmount
-        },
-        priority: 'high',
-        action_url: `/borrow-logs/${borrowLog._id}`
-      });
-    }
-
-    // Notify the borrower about the return
-    await createNotification({
-      user: borrowLog.user,
-      type: 'item_return_confirmation',
-      title: 'Item Return Confirmed',
-      message: `You have successfully returned ${item.name}`,
-      data: {
-        item_id: item._id,
-        item_name: item.name,
-        returned_at: new Date(),
-        condition_after,
-        fine_imposed: fineAmount > 0 ? 'Yes' : 'No',
-        fine_amount: fineAmount
+    // Send notifications using the centralized function
+    await sendBorrowStatusUpdate(
+      {
+        ...borrowLog.toObject(),
+        item: { _id: item._id, name: item.name },
+        lab: borrowLog.lab,
+        user: borrowLog.user._id,
+        expected_return_date: borrowLog.expected_return_date
       },
-      action_url: `/my-borrowings/${borrowLog._id}`
-    });
+      req.user,
+      'returned',
+      { 
+        condition_after,
+        damage_notes: damage_notes || '',
+        fine_amount: fineAmount,
+        session 
+      }
+    );
 
     await session.commitTransaction();
     session.endSession();
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Item returned successfully',
       data: {
         ...borrowLog.toObject(),
-        fine_amount: fineAmount
+        fine_amount: fineAmount,
+        is_overdue: isOverdue
       }
     });
   } catch (error) {
     await session.abortTransaction();
-    console.error('Return item error:', error);
-    res.status(500).json({
+    console.error('Error in returnItem:', {
+      error: error.message,
+      stack: error.stack,
+      request: {
+        params: req.params,
+        body: req.body,
+        user: req.user ? { id: req.user.id, role: req.user.role } : 'no user',
+      },
+    });
+    
+    return res.status(500).json({
       success: false,
-      message: 'Error returning item',
-      errors: [error.message]
+      message: 'Error processing item return',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
     });
   } finally {
     session.endSession();

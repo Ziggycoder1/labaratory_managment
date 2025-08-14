@@ -1,16 +1,42 @@
 const { Notification, NOTIFICATION_TYPES } = require('../models/Notification');
 const User = require('../models/User');
+const { Types: { ObjectId } } = require('mongoose');
 
 // GET /api/notifications
 exports.getNotifications = async (req, res) => {
   try {
     const userId = req.user._id;
+    console.log('Fetching notifications for user ID:', userId, 'Type:', typeof userId);
+    
     const { unread_only, type, page = 1, limit = 20 } = req.query;
-    const filter = { user: userId };
-    if (unread_only === 'true') filter.is_read = false;
-    if (type) filter.type = type;
+    console.log('Query params:', { unread_only, type, page, limit });
+    
+    // Convert userId to ObjectId for consistent comparison
+    const userIdObj = new ObjectId(userId);
+    
+    // Build filter with explicit type conversion
+    const filter = { user: userIdObj };
+    
+    if (unread_only === 'true') {
+      filter.is_read = false;
+      console.log('Filtering for unread notifications only');
+    }
+    
+    if (type) {
+      filter.type = type;
+      console.log('Filtering by type:', type);
+    }
+    
     const skip = (page - 1) * limit;
+    
+    // Log the filter being used
+    console.log('MongoDB filter:', JSON.stringify(filter));
+    
+    // Get total count with the same filter
     const totalCount = await Notification.countDocuments(filter);
+    console.log('Total notifications matching filter:', totalCount);
+    
+    // Get paginated notifications
     const notifications = await Notification.find(filter)
       .sort({ created_at: -1 })
       .skip(skip)
@@ -18,6 +44,19 @@ exports.getNotifications = async (req, res) => {
       .populate('related_item', 'name code')
       .populate('related_lab', 'name code')
       .lean();
+    
+    console.log(`Found ${notifications.length} notifications for user ${userId}`);
+    
+    if (notifications.length > 0) {
+      console.log('Sample notification (first one):', {
+        id: notifications[0]._id,
+        type: notifications[0].type,
+        title: notifications[0].title,
+        created_at: notifications[0].created_at,
+        user: notifications[0].user,
+        user_type: typeof notifications[0].user
+      });
+    }
 
     // Format the response to match frontend expectations
     const formattedNotifications = notifications.map(notification => ({
@@ -34,9 +73,10 @@ exports.getNotifications = async (req, res) => {
       priority: notification.priority
     }));
 
-    const unread_count = await Notification.countDocuments({ user: userId, is_read: false });
+    const unread_count = await Notification.countDocuments({ user: userIdObj, is_read: false });
+    console.log('Unread count for user:', unread_count);
     
-    res.json({
+    const response = {
       success: true,
       data: {
         notifications: formattedNotifications,
@@ -48,13 +88,23 @@ exports.getNotifications = async (req, res) => {
         },
         unread_count
       }
-    });
+    };
+    
+    console.log('Sending response with', formattedNotifications.length, 'notifications');
+    res.json(response);
+    
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    console.error('Error in getNotifications:', {
+      message: error.message,
+      stack: error.stack,
+      userId: req.user?._id,
+      query: req.query
+    });
+    
     res.status(500).json({ 
       success: false, 
       message: 'Error fetching notifications', 
-      error: error.message 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 };
