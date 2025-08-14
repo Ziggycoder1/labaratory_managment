@@ -68,20 +68,36 @@ const createNotification = async ({
 // Existing notification functions (can call createNotification as needed)
 const sendBookingNotificationToAdmin = async (booking, user) => {
   try {
-    // Example: send to all admins
-    const admins = await User.find({ role: 'admin' });
-    for (const admin of admins) {
-      await createNotification({
-        user: admin._id,
-        type: 'booking_request',
-        title: 'New Booking Request',
-        message: `${user.full_name} booked ${booking.lab.name} for ${booking.purpose}`,
-        data: { booking_id: booking._id, lab_name: booking.lab.name, start_time: booking.start_time },
-        action_url: `/bookings/${booking._id}`
-      });
+    const deptId = booking.lab?.department?._id || booking.lab?.department || booking.department_id;
+    // Fetch admins and lab managers of the booking's department
+    const [admins, deptManagers] = await Promise.all([
+      User.find({ role: 'admin' }).select('_id'),
+      deptId ? User.find({ 
+        role: 'lab_manager', 
+        $or: [ { department: deptId }, { departments: deptId } ] 
+      }).select('_id') : Promise.resolve([])
+    ]);
+
+    // Deduplicate recipients (in case a user is both)
+    const recipientIds = new Set([
+      ...admins.map(a => a._id.toString()),
+      ...deptManagers.map(m => m._id.toString())
+    ]);
+
+    const baseData = {
+      type: 'booking_request',
+      title: 'New Booking Request',
+      message: `${user.full_name} booked ${booking.lab?.name || 'a lab'} for ${booking.purpose || ''}`.trim(),
+      data: { booking_id: booking._id, lab_name: booking.lab?.name, start_time: booking.start_time },
+      action_url: `/bookings/${booking._id}`,
+      related_lab: booking.lab?._id
+    };
+
+    for (const id of recipientIds) {
+      await createNotification({ ...baseData, user: id });
     }
   } catch (error) {
-    console.error('Error sending admin notification:', error);
+    console.error('Error sending admin/manager notifications for booking:', error);
   }
 };
 
@@ -131,31 +147,44 @@ const sendBookingStatusUpdate = async (booking, user, status, rejectionReason = 
       
       await createNotification({
         user: adminId,
-        type: 'booking_approval_confirmation',
-        title: 'Booking Approved',
+        type,
+        title: 'You approved a booking',
         message: adminMessage,
-        data: {
-          booking_id: booking?._id,
-          lab_name: booking.lab?.name,
-          student_name: user?.full_name,
-          student_email: user?.email,
-          start_time: booking.start_time
-        },
+        data: { booking_id: booking?._id, status },
         action_url: `/bookings/${booking?._id || ''}`,
-        related_lab: related_lab || booking.lab?._id,
-        priority: 'normal'
+        related_lab: related_lab || booking.lab?._id
       });
     }
     
-    return true;
+    // Notify global admins and lab managers of the booking's department on status change as well
+    const deptId = booking.lab?.department?._id || booking.lab?.department || booking.department_id;
+    const [admins, deptManagers] = await Promise.all([
+      User.find({ role: 'admin' }).select('_id'),
+      deptId ? User.find({ 
+        role: 'lab_manager', 
+        $or: [ { department: deptId }, { departments: deptId } ] 
+      }).select('_id') : Promise.resolve([])
+    ]);
+    const recipientIds = new Set([
+      ...admins.map(a => a._id.toString()),
+      ...deptManagers.map(m => m._id.toString())
+    ]);
+    const mgrMsg = status === 'approved'
+      ? `Booking #${booking.booking_reference || booking._id} for ${booking.lab?.name || 'a lab'} has been approved`
+      : `Booking #${booking.booking_reference || booking._id} for ${booking.lab?.name || 'a lab'} was rejected${rejectionReason ? ': ' + rejectionReason : ''}`;
+    for (const id of recipientIds) {
+      await createNotification({
+        user: id,
+        type,
+        title,
+        message: mgrMsg,
+        data: { booking_id: booking?._id, status },
+        action_url: `/bookings/${booking?._id || ''}`,
+        related_lab: related_lab || booking.lab?._id
+      });
+    }
   } catch (error) {
-    console.error('Error in sendBookingStatusUpdate:', {
-      message: error.message,
-      stack: error.stack,
-      bookingId: booking?._id,
-      userId: user?._id
-    });
-    return false;
+    console.error('Error sending booking status update:', error);
   }
 };
 

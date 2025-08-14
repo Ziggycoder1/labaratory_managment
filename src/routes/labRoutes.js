@@ -126,7 +126,7 @@ const labQueryValidations = [
   query('field_id').optional().isMongoId().withMessage('Invalid field ID')
 ];
 
-// Main labs endpoint with filtering and pagination
+// Main labs endpoint with filtering and pagination (protected for scoped listing)
 router.get('/',
   labQueryValidations,
   (req, res, next) => {
@@ -134,6 +134,9 @@ router.get('/',
     console.log('Query params:', req.query);
     next();
   },
+  auth,
+  checkRole(['admin', 'department_admin', 'lab_manager', 'teacher', 'student', 'external_user']),
+  checkDepartmentAccess,
   validateRequest(labQueryValidations),
   getAllLabs
 );
@@ -245,7 +248,7 @@ const createLabHandler = [
   
   // Role-based access control
   (req, res, next) => {
-    checkRole(['admin'])(req, res, (err) => {
+    checkRole(['admin', 'department_admin', 'lab_manager'])(req, res, (err) => {
       if (err) return next(err);
       console.log('After checkRole - User has required role');
       next();
@@ -366,7 +369,7 @@ router.put('/:id',
   auth,
   
   // Role-based access control
-  checkRole(['admin', 'department_admin']), 
+  checkRole(['admin', 'department_admin', 'lab_manager']), 
   
   // Department access control
   enhancedCheckDepartmentAccess,
@@ -457,6 +460,16 @@ router.delete('/:id',
   // Authentication
   auth,
   
+  // Role-based access control
+  checkRole(['admin', 'department_admin', 'lab_manager']),
+  
+  // Department access control
+  enhancedCheckDepartmentAccess,
+  
+  // Validate param
+  [param('id').isMongoId().withMessage('Invalid lab ID')],
+  validateRequest,
+   
   // Directly call the controller
   async (req, res) => {
     try {

@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query, param } = require('express-validator');
 const bookingController = require('../controllers/bookingController');
-const { auth, checkRole } = require('../middleware/auth.middleware');
+const { auth, checkRole, checkDepartmentAccess } = require('../middleware/auth.middleware');
 const router = express.Router();
 
 // Validation middleware
@@ -55,6 +55,7 @@ const validateAvailability = [
 router.get('/', 
   auth,
   checkRole(['admin', 'department_admin', 'lab_manager', 'teacher', 'student', 'external']),
+  checkDepartmentAccess,
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('populate').optional().isString().withMessage('Populate must be a string'),
@@ -65,12 +66,14 @@ router.get('/',
 router.get('/stats',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   bookingController.getBookingStats
 );
 
 // Get booking calendar view
 router.get('/calendar',
   auth,
+  checkDepartmentAccess,
   bookingController.getBookingCalendar
 );
 
@@ -78,18 +81,21 @@ router.get('/calendar',
 router.get('/pending/count',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   bookingController.getPendingBookingsCount
 );
 
 // Get today's bookings
 router.get('/today',
   auth,
+  checkDepartmentAccess,
   bookingController.getTodayBookings
 );
 
 // Get upcoming bookings (next 7 days)
 router.get('/upcoming',
   auth,
+  checkDepartmentAccess,
   bookingController.getUpcomingBookings
 );
 
@@ -97,6 +103,7 @@ router.get('/upcoming',
 router.get('/utilization/report',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   bookingController.getLabUtilizationReport
 );
 

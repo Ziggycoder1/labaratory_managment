@@ -46,13 +46,19 @@ const getAllBookings = async (req, res) => {
     const userRole = req.user?.role;
     const userId = req.user?._id;
 
-    if (userRole === 'admin' || userRole === 'lab_manager') {
-      // Admins and lab managers can see all bookings
-      // No additional filtering needed
-    } else if (userRole === 'department_admin') {
-      // Department admins can only see bookings for labs in their department
-      const labs = await Lab.find({ department: req.user.department._id }).select('_id');
-      const labIds = labs.map(l => l._id);
+    if (userRole === 'admin') {
+      // Admins can see all bookings
+    } else if (userRole === 'lab_manager' || userRole === 'department_admin') {
+      // Scoped by department labs provided by middleware
+      let labIds = (req.departmentScope && !req.departmentScope.global) ? (req.departmentScope.labIds || []) : [];
+      // If a specific department_id is requested, further narrow labs to that department
+      const requestedDeptId = req.query.department_id;
+      if (requestedDeptId) {
+        // Intersect with labs of the requested department
+        const deptLabIds = await Lab.find({ department: requestedDeptId }).select('_id');
+        const deptLabIdSet = new Set(deptLabIds.map(l => l._id.toString()));
+        labIds = labIds.filter(id => deptLabIdSet.has(id.toString()));
+      }
       filter.lab = { $in: labIds };
     } else if (userRole === 'teacher' || userRole === 'instructor') {
       // Teachers can see their own bookings and bookings for their courses/fields
@@ -70,6 +76,18 @@ const getAllBookings = async (req, res) => {
     } else {
       // Default: only show user's own bookings
       filter.user = userId;
+    }
+
+    // Enforce department scope again (in case of additional query filters),
+    // but keep any requested department_id narrowing applied above.
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const scopeLabIds = req.departmentScope.labIds || [];
+      if (filter.lab && filter.lab.$in) {
+        const scopeSet = new Set(scopeLabIds.map(id => id.toString()));
+        filter.lab = { $in: filter.lab.$in.filter(id => scopeSet.has(id.toString())) };
+      } else {
+        filter.lab = { $in: scopeLabIds };
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -147,6 +165,19 @@ const getBookingById = async (req, res) => {
         success: false,
         message: 'Booking not found'
       });
+    }
+
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const labIds = (req.departmentScope.labIds || []).map(id => id.toString());
+      const bookingLabId = booking.lab?._id?.toString() || booking.lab?.toString();
+      if (bookingLabId && !labIds.includes(bookingLabId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to access this booking']
+        });
+      }
     }
 
     res.json({
@@ -593,6 +624,21 @@ const approveBooking = async (req, res) => {
       });
     }
 
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const labIds = (req.departmentScope.labIds || []).map(id => id.toString());
+      const bookingLabId = booking.lab?._id?.toString() || booking.lab?.toString();
+      if (bookingLabId && !labIds.includes(bookingLabId)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to approve this booking']
+        });
+      }
+    }
+
     // Process item requirements
     if (booking.item_requirements && booking.item_requirements.length > 0) {
       const Item = mongoose.model('Item');
@@ -768,6 +814,21 @@ const rejectBooking = async (req, res) => {
       });
     }
 
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const labIds = (req.departmentScope.labIds || []).map(id => id.toString());
+      const bookingLabId = booking.lab?._id?.toString() || booking.lab?.toString();
+      if (bookingLabId && !labIds.includes(bookingLabId)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to reject this booking']
+        });
+      }
+    }
+
     // Update booking with rejection details
     // Use set to mark fields as modified
     booking.set({
@@ -868,6 +929,15 @@ const cancelBooking = async (req, res) => {
         throw new ErrorResponse('Not authorized to cancel this booking', 403);
       }
 
+      // Department scope enforcement for non-admins
+      if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+        const labIds = (req.departmentScope.labIds || []).map(id => id.toString());
+        const bookingLabId = booking.lab?._id?.toString() || booking.lab?.toString();
+        if (bookingLabId && !labIds.includes(bookingLabId)) {
+          throw new ErrorResponse('Access denied: cannot cancel booking outside your department', 403);
+        }
+      }
+
       // Release any allocated items if booking was approved
       if (booking.status === 'approved' && booking.item_requirements && booking.item_requirements.length > 0) {
         console.log(`Releasing items for booking ${booking._id}`);
@@ -954,483 +1024,6 @@ const cancelBooking = async (req, res) => {
   }
 };
 
-// Check lab availability
-const checkLabAvailability = async (req, res) => {
-  try {
-    const { lab_id, start_time, end_time, booking_id } = req.body;
-
-    if (!lab_id || !start_time || !end_time) {
-      return res.status(400).json({
-        success: false,
-        message: 'Lab ID, start time, and end time are required'
-      });
-    }
-
-    const startDate = new Date(start_time);
-    const endDate = new Date(end_time);
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid date format. Please use ISO 8601 format (e.g., 2023-01-01T09:00:00.000Z)'
-      });
-    }
-
-    if (startDate >= endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'End time must be after start time'
-      });
-    }
-
-    // Check for conflicting bookings
-    const query = {
-      lab: lab_id,
-      status: { $in: ['pending', 'approved'] },
-      $or: [
-        {
-          // Bookings that start or end on the target date
-          $or: [
-            { start_time: { $lt: endDate }, end_time: { $gt: startDate } },
-            { end_time: { $gt: startDate }, start_time: { $lt: endDate } },
-            { 
-              // Multi-day bookings that span the target date
-              start_time: { $lte: startDate },
-              end_time: { $gte: endDate }
-            }
-          ]
-        }
-      ]
-    };
-
-    // Exclude current booking when checking for updates
-    if (booking_id) {
-      query._id = { $ne: booking_id };
-    }
-
-    const conflictingBookings = await Booking.find(query)
-      .populate('user', 'full_name email')
-      .populate('lab', 'name')
-      .populate('field', 'name')
-      .sort({ start_time: 1 });
-
-    res.json({
-      success: true,
-      data: {
-        is_available: conflictingBookings.length === 0,
-        conflicting_bookings: conflictingBookings,
-        requested_slot: {
-          start_time: startDate,
-          end_time: endDate,
-          duration_minutes: (endDate - startDate) / (1000 * 60)
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Check lab availability error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error checking lab availability',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get my bookings (for current user)
-const getMyBookings = async (req, res) => {
-  try {
-    const user_id = req.user.id;
-    const { status, page = 1, limit = 20 } = req.query;
-    
-    const filter = { user: user_id };
-    if (status) filter.status = status;
-
-    const skip = (page - 1) * limit;
-    const totalCount = await Booking.countDocuments(filter);
-    
-    const bookings = await Booking.find(filter)
-      .populate('lab', 'name code')
-      .populate('field', 'name code')
-      .sort({ start_time: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    res.json({
-      success: true,
-      data: {
-        bookings,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(totalCount / limit),
-          total_count: totalCount,
-          per_page: parseInt(limit)
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Get my bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching your bookings',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get booking statistics
-const getBookingStats = async (req, res) => {
-  try {
-    const stats = await Booking.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          total_hours: { $sum: { $divide: [{ $subtract: ['$end_time', '$start_time'] }, 1000 * 60 * 60] } }
-        }
-      }
-    ]);
-
-    const totalBookings = await Booking.countDocuments();
-    const upcomingBookings = await Booking.countDocuments({
-      start_time: { $gte: new Date() },
-      status: { $in: ['pending', 'approved'] }
-    });
-
-    res.json({
-      success: true,
-      data: {
-        stats,
-        total_bookings: totalBookings,
-        upcoming_bookings: upcomingBookings
-      }
-    });
-  } catch (error) {
-    console.error('Get booking stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching booking statistics',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get booking calendar view
-const getBookingCalendar = async (req, res) => {
-  try {
-    const { lab_id, month, year } = req.query;
-    const startDate = new Date(year || new Date().getFullYear(), month ? month - 1 : new Date().getMonth(), 1);
-    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59);
-    
-    const filter = {
-      status: { $in: ['pending', 'approved'] },
-      start_time: { $gte: startDate, $lte: endDate }
-    };
-    
-    if (lab_id) filter.lab = lab_id;
-
-    const bookings = await Booking.find(filter)
-      .populate('lab', 'name')
-      .populate('field', 'name')
-      .populate('user', 'full_name')
-      .sort({ start_time: 1 });
-
-    res.json({
-      success: true,
-      data: bookings
-    });
-  } catch (error) {
-    console.error('Get booking calendar error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching booking calendar',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get pending bookings count
-const getPendingBookingsCount = async (req, res) => {
-  try {
-    const count = await Booking.countDocuments({ status: 'pending' });
-    res.json({
-      success: true,
-      data: { count }
-    });
-  } catch (error) {
-    console.error('Get pending bookings count error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching pending bookings count',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get today's bookings
-const getTodayBookings = async (req, res) => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const bookings = await Booking.find({
-      status: { $in: ['pending', 'approved'] },
-      start_time: { $gte: today, $lt: tomorrow }
-    })
-    .populate('lab', 'name code')
-    .populate('field', 'name')
-    .populate('user', 'full_name')
-    .sort({ start_time: 1 });
-
-    res.json({
-      success: true,
-      data: bookings
-    });
-  } catch (error) {
-    console.error('Get today\'s bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching today\'s bookings',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get upcoming bookings
-const getUpcomingBookings = async (req, res) => {
-  try {
-    const { limit = 10 } = req.query;
-    const now = new Date();
-
-    const bookings = await Booking.find({
-      status: { $in: ['pending', 'approved'] },
-      start_time: { $gte: now }
-    })
-    .populate('lab', 'name code')
-    .populate('field', 'name')
-    .populate('user', 'full_name')
-    .sort({ start_time: 1 })
-    .limit(parseInt(limit));
-
-    res.json({
-      success: true,
-      data: bookings
-    });
-  } catch (error) {
-    console.error('Get upcoming bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching upcoming bookings',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get lab utilization report
-const getLabUtilizationReport = async (req, res) => {
-  try {
-    const { start_date, end_date } = req.query;
-    const startDate = start_date ? new Date(start_date) : new Date();
-    const endDate = end_date ? new Date(end_date) : new Date();
-    
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    const report = await Booking.aggregate([
-      {
-        $match: {
-          status: 'approved',
-          start_time: { $gte: startDate, $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: '$lab',
-          total_hours: { 
-            $sum: { 
-              $divide: [
-                { $subtract: ['$end_time', '$start_time'] },
-                1000 * 60 * 60 // Convert milliseconds to hours
-              ]
-            }
-          },
-          booking_count: { $sum: 1 }
-        }
-      },
-      {
-        $lookup: {
-          from: 'labs',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'lab'
-        }
-      },
-      { $unwind: '$lab' },
-      {
-        $project: {
-          _id: 0,
-          lab_id: '$_id',
-          lab_name: '$lab.name',
-          total_hours: 1,
-          booking_count: 1,
-          utilization_percentage: {
-            $multiply: [
-              { 
-                $divide: [
-                  { $multiply: ['$total_hours', 100] },
-                  { $multiply: [168, 1] } // 168 hours in a week
-                ]
-              },
-              1 // To ensure it's a number
-            ]
-          }
-        }
-      },
-      { $sort: { total_hours: -1 } }
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        start_date: startDate,
-        end_date: endDate,
-        report
-      }
-    });
-  } catch (error) {
-    console.error('Get lab utilization report error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error generating lab utilization report',
-      errors: [error.message]
-    });
-  }
-};
-
-// Get available time slots for a lab within a date range
-const getAvailableTimeSlots = async (req, res) => {
-  try {
-    // ... (rest of the code remains the same)
-
-    // Get existing bookings for the day
-    const existingBookings = await Booking.find({
-      lab: lab_id,
-      status: { $in: ['approved', 'pending'] },
-      $or: [
-        {
-          // Bookings that start or end on the target date
-          $or: [
-            { start_time: { $gte: dayStart.toDate(), $lt: dayEnd.toDate() } },
-            { end_time: { $gt: dayStart.toDate(), $lte: dayEnd.toDate() } },
-            { 
-              // Multi-day bookings that span the target date
-              start_time: { $lte: dayStart.toDate() },
-              end_time: { $gte: dayEnd.toDate() }
-            }
-          ]
-        }
-      ]
-    }).sort({ start_time: 1 });
-
-    // Generate time slots based on operating hours and existing bookings
-    const slotDuration = duration; // in minutes
-    const slotInterval = 15; // minutes between slots
-    const slots = [];
-    
-    let currentSlotStart = dayStart.clone();
-    
-    while (currentSlotStart.isBefore(dayEnd)) {
-      const slotEnd = currentSlotStart.clone().add(slotDuration, 'minutes');
-      
-      // Skip if slot goes beyond operating hours
-      if (slotEnd.isAfter(dayEnd)) {
-        break;
-      }
-      
-      // Check if this slot is available
-      const isAvailable = !existingBookings.some(booking => {
-        const bookingStart = moment(booking.start_time);
-        const bookingEnd = moment(booking.end_time);
-        return (
-          (currentSlotStart.isBetween(bookingStart, bookingEnd, null, '[)')) ||
-          (slotEnd.isBetween(bookingStart, bookingEnd, null, '(]')) ||
-          (bookingStart.isBetween(currentSlotStart, slotEnd, null, '[]'))
-        );
-      });
-      
-      if (isAvailable) {
-        slots.push({
-          start_time: currentSlotStart.toISOString(),
-          end_time: slotEnd.toISOString(),
-          duration_minutes: slotDuration,
-          is_available: true
-        });
-        
-        // Skip ahead to next potential slot
-        currentSlotStart = slotEnd.clone();
-      } else {
-        // Move to next time slot
-        currentSlotStart = currentSlotStart.add(slotInterval, 'minutes');
-      }
-    }
-    
-    // Group available slots into continuous blocks
-    const continuousSlots = [];
-    if (slots.length > 0) {
-      let currentBlock = { ...slots[0], slots: [slots[0]] };
-      
-      for (let i = 1; i < slots.length; i++) {
-        const prevEnd = moment(currentBlock.end_time);
-        const currStart = moment(slots[i].start_time);
-        
-        if (currStart.diff(prevEnd, 'minutes') <= slotInterval) {
-          // Extend current block
-          currentBlock.end_time = slots[i].end_time;
-          currentBlock.duration_minutes = moment(currentBlock.end_time).diff(
-            moment(currentBlock.start_time), 'minutes'
-          );
-          currentBlock.slots.push(slots[i]);
-        } else {
-          // Start new block
-          continuousSlots.push(currentBlock);
-          currentBlock = { ...slots[i], slots: [slots[i]] };
-        }
-      }
-      
-      // Add the last block
-      continuousSlots.push(currentBlock);
-    }
-    
-    res.json({
-      success: true,
-      data: {
-        lab: {
-          id: lab._id,
-          name: lab.name,
-          operating_hours: operatingHours
-        },
-        date: targetDate.format('YYYY-MM-DD'),
-        timezone: timezone,
-        duration_minutes: duration,
-        available_slots: continuousSlots,
-        total_available_slots: continuousSlots.reduce((sum, block) => sum + block.slots.length, 0),
-        total_available_minutes: continuousSlots.reduce((sum, block) => sum + block.duration_minutes, 0)
-      }
-    });
-    
-  } catch (error) {
-    console.error('Get available time slots error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching available time slots',
-      errors: [error.message],
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-};
-
 // @desc    Complete a booking and release items
 // @route   PATCH /api/bookings/:id/complete
 // @access  Private (Lab Manager/Admin)
@@ -1473,6 +1066,15 @@ const completeBooking = async (req, res) => {
         throw new ErrorResponse('Only approved bookings can be marked as completed', 400);
       }
       
+      // Department scope enforcement for non-admins
+      if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+        const labIds = (req.departmentScope.labIds || []).map(id => id.toString());
+        const bookingLabId = booking.lab?._id?.toString() || booking.lab?.toString();
+        if (bookingLabId && !labIds.includes(bookingLabId)) {
+          throw new ErrorResponse('Access denied: cannot complete booking outside your department', 403);
+        }
+      }
+
       // Release any allocated items
       if (booking.item_requirements && booking.item_requirements.length > 0) {
         await releaseBookingItems(booking._id, userId, 'booking_completed_manual', session);
@@ -1566,6 +1168,349 @@ const completeBooking = async (req, res) => {
   }
 };
 
+// Get today's bookings
+const getTodayBookings = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const filter = {
+      status: { $in: ['pending', 'approved'] },
+      start_time: { $gte: today, $lt: tomorrow }
+    };
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      filter.lab = { $in: req.departmentScope.labIds || [] };
+    }
+
+    const bookings = await Booking.find(filter)
+      .populate('lab', 'name code')
+      .populate('field', 'name')
+      .populate('user', 'full_name')
+      .sort({ start_time: 1 });
+
+    res.json({
+      success: true,
+      data: bookings
+    });
+  } catch (error) {
+    console.error('Get today\'s bookings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching today\'s bookings',
+      errors: [error.message]
+    });
+  }
+};
+
+// Get upcoming bookings
+const getUpcomingBookings = async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    const now = new Date();
+
+    const filter = {
+      status: { $in: ['pending', 'approved'] },
+      start_time: { $gte: now }
+    };
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      filter.lab = { $in: req.departmentScope.labIds || [] };
+    }
+
+    const bookings = await Booking.find(filter)
+      .populate('lab', 'name code')
+      .populate('field', 'name')
+      .populate('user', 'full_name')
+      .sort({ start_time: 1 })
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      data: bookings
+    });
+  } catch (error) {
+    console.error('Get upcoming bookings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching upcoming bookings',
+      errors: [error.message]
+    });
+  }
+};
+
+// Get booking calendar view
+const getBookingCalendar = async (req, res) => {
+  try {
+    const { lab_id, month, year } = req.query;
+    const startDate = new Date(year || new Date().getFullYear(), month ? month - 1 : new Date().getMonth(), 1);
+    const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59);
+    
+    const filter = {
+      status: { $in: ['pending', 'approved'] },
+      start_time: { $gte: startDate, $lte: endDate }
+    };
+    if (lab_id) filter.lab = lab_id;
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      filter.lab = { $in: req.departmentScope.labIds || [] };
+    }
+
+    const bookings = await Booking.find(filter)
+      .populate('lab', 'name')
+      .populate('field', 'name')
+      .populate('user', 'full_name')
+      .sort({ start_time: 1 });
+
+    res.json({
+      success: true,
+      data: bookings
+    });
+  } catch (error) {
+    console.error('Get booking calendar error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching booking calendar',
+      errors: [error.message]
+    });
+  }
+};
+
+// Get pending bookings count
+const getPendingBookingsCount = async (req, res) => {
+  try {
+    const filter = { status: 'pending' };
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      filter.lab = { $in: req.departmentScope.labIds || [] };
+    }
+    const count = await Booking.countDocuments(filter);
+    res.json({
+      success: true,
+      data: { count }
+    });
+  } catch (error) {
+    console.error('Get pending bookings count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching pending bookings count',
+      errors: [error.message]
+    });
+  }
+};
+
+// Get lab utilization report
+const getLabUtilizationReport = async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+    const startDate = start_date ? new Date(start_date) : new Date();
+    const endDate = end_date ? new Date(end_date) : new Date();
+    
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    const match = {
+      status: 'approved',
+      start_time: { $gte: startDate, $lte: endDate }
+    };
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      match.lab = { $in: (req.departmentScope.labIds || []).map(id => new ObjectId(id)) };
+    }
+
+    const report = await Booking.aggregate([
+      {
+        $match: match
+      },
+      {
+        $group: {
+          _id: '$lab',
+          total_hours: { 
+            $sum: { 
+              $divide: [
+                { $subtract: ['$end_time', '$start_time'] },
+                1000 * 60 * 60 // Convert milliseconds to hours
+              ]
+            }
+          },
+          booking_count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'labs',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'lab'
+        }
+      },
+      { $unwind: '$lab' },
+      {
+        $project: {
+          _id: 0,
+          lab_id: '$_id',
+          lab_name: '$lab.name',
+          total_hours: 1,
+          booking_count: 1,
+          utilization_percentage: {
+            $multiply: [
+              { 
+                $divide: [
+                  { $multiply: ['$total_hours', 100] },
+                  { $multiply: [168, 1] } // 168 hours in a week
+                ]
+              },
+              1 // To ensure it's a number
+            ]
+          }
+        }
+      },
+      { $sort: { total_hours: -1 } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        start_date: startDate,
+        end_date: endDate,
+        report
+      }
+    });
+  } catch (error) {
+    console.error('Get lab utilization report error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error generating lab utilization report',
+      errors: [error.message]
+    });
+  }
+};
+
+// Get booking statistics
+const getBookingStats = async (req, res) => {
+  try {
+    const baseMatch = {};
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      baseMatch.lab = { $in: (req.departmentScope.labIds || []).map(id => new ObjectId(id)) };
+    }
+
+    const stats = await Booking.aggregate([
+      { $match: baseMatch },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          total_hours: {
+            $sum: { $divide: [ { $subtract: ['$end_time', '$start_time'] }, 1000 * 60 * 60 ] }
+          }
+        }
+      }
+    ]);
+
+    const now = new Date();
+    const totalBookings = await Booking.countDocuments(baseMatch);
+    const upcomingMatch = { ...baseMatch, start_time: { $gte: now }, status: { $in: ['pending', 'approved'] } };
+    const upcomingBookings = await Booking.countDocuments(upcomingMatch);
+
+    res.json({ success: true, data: { stats, total_bookings: totalBookings, upcoming_bookings: upcomingBookings } });
+  } catch (error) {
+    console.error('Get booking stats error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching booking statistics', errors: [error.message] });
+  }
+};
+
+// Check lab availability
+const checkLabAvailability = async (req, res) => {
+  try {
+    const { lab_id, start_time, end_time, exclude_booking_id } = req.query;
+
+    if (!lab_id || !start_time || !end_time) {
+      return res.status(400).json({ success: false, message: 'lab_id, start_time and end_time are required' });
+    }
+
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const allowed = (req.departmentScope.labIds || []).map(id => id.toString());
+      if (!allowed.includes(lab_id.toString())) {
+        return res.status(403).json({ success: false, message: 'Access denied: lab is outside your department' });
+      }
+    }
+
+    const startDate = new Date(start_time);
+    const endDate = new Date(end_time);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate >= endDate) {
+      return res.status(400).json({ success: false, message: 'Invalid time range' });
+    }
+
+    const query = {
+      lab: lab_id,
+      status: { $in: ['pending', 'approved'] },
+      $or: [
+        { start_time: { $lt: endDate }, end_time: { $gt: startDate } },
+        { end_time: { $gt: startDate }, start_time: { $lt: endDate } },
+        { start_time: { $lte: startDate }, end_time: { $gte: endDate } }
+      ]
+    };
+    if (exclude_booking_id) query._id = { $ne: exclude_booking_id };
+
+    const conflicting = await Booking.find(query)
+      .populate('user', 'full_name email')
+      .populate('lab', 'name')
+      .populate('field', 'name')
+      .sort({ start_time: 1 });
+
+    return res.json({
+      success: true,
+      data: {
+        is_available: conflicting.length === 0,
+        conflicting_bookings: conflicting,
+        requested_slot: {
+          start_time: startDate,
+          end_time: endDate,
+          duration_minutes: (endDate - startDate) / (1000 * 60)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Check lab availability error:', error);
+    res.status(500).json({ success: false, message: 'Error checking lab availability', errors: [error.message] });
+  }
+};
+
+// Get my bookings (for current user)
+const getMyBookings = async (req, res) => {
+  try {
+    const user_id = req.user.id || req.user._id;
+    const { status, page = 1, limit = 20 } = req.query;
+    const filter = { user: user_id };
+    if (status) filter.status = status;
+
+    const skip = (page - 1) * limit;
+    const totalCount = await Booking.countDocuments(filter);
+
+    const bookings = await Booking.find(filter)
+      .populate('lab', 'name code')
+      .populate('field', 'name code')
+      .sort({ start_time: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      success: true,
+      data: {
+        bookings,
+        pagination: {
+          current_page: parseInt(page),
+          total_pages: Math.ceil(totalCount / limit),
+          total_count: totalCount,
+          per_page: parseInt(limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get my bookings error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching your bookings', errors: [error.message] });
+  }
+};
+
 module.exports = {
   completeBooking,
   getAllBookings,
@@ -1575,13 +1520,13 @@ module.exports = {
   approveBooking,
   rejectBooking,
   cancelBooking,
+  // restored handlers referenced by routes
   checkLabAvailability,
-  getAvailableTimeSlots,
   getMyBookings,
   getBookingStats,
-  getBookingCalendar,
-  getPendingBookingsCount,
   getTodayBookings,
   getUpcomingBookings,
+  getBookingCalendar,
+  getPendingBookingsCount,
   getLabUtilizationReport
 };

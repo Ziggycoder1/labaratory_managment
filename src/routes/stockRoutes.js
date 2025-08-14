@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, param, query } = require('express-validator');
 const stockController = require('../controllers/stockController');
-const { auth, checkRole } = require('../middleware/auth.middleware');
+const { auth, checkRole, checkDepartmentAccess } = require('../middleware/auth.middleware');
 
 // Validation middleware
 const validateStockOperation = [
@@ -26,6 +26,7 @@ router.post(
   '/:itemId/add',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   [
     param('itemId').isMongoId().withMessage('Invalid item ID'),
     ...validateStockOperation
@@ -38,6 +39,7 @@ router.post(
   '/:itemId/remove',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   [
     param('itemId').isMongoId().withMessage('Invalid item ID'),
     ...validateStockOperation
@@ -50,6 +52,7 @@ router.post(
   '/:itemId/move',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   [
     param('itemId').isMongoId().withMessage('Invalid item ID'),
     body('target_lab_id')
@@ -69,6 +72,7 @@ router.post(
   '/:itemId/adjust',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   [
     param('itemId').isMongoId().withMessage('Invalid item ID'),
     body('new_quantity')
@@ -107,6 +111,7 @@ router.get(
   '/low-stock',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   [
     query('lab_id')
       .optional()
@@ -121,6 +126,7 @@ router.get(
   '/expiring',
   auth,
   checkRole(['admin', 'lab_manager']),
+  checkDepartmentAccess,
   [
     query('lab_id')
       .optional()

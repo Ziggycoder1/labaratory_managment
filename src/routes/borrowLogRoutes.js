@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query, param } = require('express-validator');
 const borrowLogController = require('../controllers/borrowLogController');
-const { auth, checkRole } = require('../middleware/auth.middleware');
+const { auth, checkRole, checkDepartmentAccess } = require('../middleware/auth.middleware');
 const router = express.Router();
 
 // Validation middleware
@@ -53,6 +53,7 @@ router.get('/active/borrows',
 
 // Protected routes (require authentication)
 router.use(auth);
+router.use(checkDepartmentAccess);
 
 // Get all borrow logs (admin, lab_manager, department_admin)
 router.get(
@@ -62,6 +63,7 @@ router.get(
     query('item_id').optional().isMongoId().withMessage('Item ID must be a valid MongoDB ID'),
     query('user_id').optional().isMongoId().withMessage('User ID must be a valid MongoDB ID'),
     query('lab_id').optional().isMongoId().withMessage('Lab ID must be a valid MongoDB ID'),
+    query('department_id').optional().isMongoId().withMessage('Department ID must be a valid MongoDB ID'),
     query('status')
       .optional()
       .isIn(['pending', 'approved', 'rejected', 'borrowed', 'returned', 'overdue'])
@@ -86,10 +88,10 @@ router.post(
   borrowLogController.borrowItem
 );
 
-// Approve a borrow request (lab_manager, admin)
+// Approve a borrow request (lab_manager, admin, department_admin)
 router.put(
   '/:id/approve',
-  checkRole(['admin', 'lab_manager']),
+  checkRole(['admin', 'lab_manager', 'department_admin']),
   [
     param('id').isMongoId().withMessage('Borrow log ID must be a valid MongoDB ID'),
     ...validateApproveRequest
@@ -97,10 +99,10 @@ router.put(
   borrowLogController.approveBorrowRequest
 );
 
-// Reject a borrow request (lab_manager, admin)
+// Reject a borrow request (lab_manager, admin, department_admin)
 router.put(
   '/:id/reject',
-  checkRole(['admin', 'lab_manager']),
+  checkRole(['admin', 'lab_manager', 'department_admin']),
   [
     param('id').isMongoId().withMessage('Borrow log ID must be a valid MongoDB ID'),
     ...validateRejectRequest
@@ -137,6 +139,7 @@ router.get(
   '/pending/requests',
   checkRole(['admin', 'lab_manager', 'department_admin']),
   [
+    query('department_id').optional().isMongoId().withMessage('Department ID must be a valid MongoDB ID'),
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
   ],
@@ -148,6 +151,7 @@ router.get(
   '/overdue/items',
   checkRole(['admin', 'lab_manager', 'department_admin']),
   [
+    query('department_id').optional().isMongoId().withMessage('Department ID must be a valid MongoDB ID'),
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
   ],

@@ -12,62 +12,52 @@ const { createNotification, sendBorrowStatusUpdate } = require('../utils/notific
 const getAllBorrowLogs = async (req, res) => {
   try {
     const { item_id, user_id, lab_id, status, page = 1, limit = 20 } = req.query;
+    const departmentParam = req.query.department_id || req.query.department;
     const filter = {};
     
     // Always filter by item_id if provided
     if (item_id) filter.item = item_id;
     
-    // Apply role-based filtering
-    switch (req.user.role) {
-      case 'admin':
-        // Admins can see all borrow logs
-        if (user_id) filter.user = user_id;
-        break;
-        
-      case 'lab_manager':
-      case 'department_admin':
-        // Lab managers and department admins can see logs from their labs
-        const labs = req.user.managed_labs || [];
-        if (req.user.role === 'department_admin' && req.user.department) {
-          // For department admins, get all labs in their department
-          const departmentLabs = await Lab.find({ department: req.user.department }).select('_id');
-          departmentLabs.forEach(lab => {
-            if (!labs.includes(lab._id)) labs.push(lab._id);
-          });
-        }
-        
-        if (labs.length > 0) {
-          filter.lab = { $in: labs };
-          // If user_id is provided, further filter by user
-          if (user_id) filter.user = user_id;
-        } else {
-          // No accessible labs, return empty result
-          return res.json({
-            success: true,
-            data: {
-              borrowLogs: [],
-              pagination: {
-                current_page: parseInt(page),
-                total_pages: 0,
-                total_count: 0,
-                per_page: parseInt(limit)
-              }
+    // Apply role-based filtering with department scope
+    if (req.user.role === 'admin') {
+      if (user_id) filter.user = user_id;
+      // Admins: allow narrowing by department to labs in that department
+      if (departmentParam) {
+        const deptLabIds = await Lab.find({ department: departmentParam }).select('_id');
+        filter.lab = { $in: deptLabIds.map(l => l._id) };
+      }
+    } else if (['lab_manager', 'department_admin'].includes(req.user.role)) {
+      const labIds = req.departmentScope && !req.departmentScope.global ? (req.departmentScope.labIds || []) : [];
+      if (labIds.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            borrowLogs: [],
+            pagination: {
+              current_page: parseInt(page),
+              total_pages: 0,
+              total_count: 0,
+              per_page: parseInt(limit)
             }
-          });
-        }
-        break;
-        
-      case 'teacher':
-      case 'student':
-      case 'external':
-      default:
-        // Regular users can only see their own borrow logs
-        filter.user = req.user.id;
-        break;
+          }
+        });
+      }
+      let scopedLabIds = labIds;
+      // If department is requested, intersect labs within that department
+      if (departmentParam) {
+        const deptLabIds = await Lab.find({ department: departmentParam }).select('_id');
+        const deptSet = new Set(deptLabIds.map(l => l._id.toString()));
+        scopedLabIds = scopedLabIds.filter(id => deptSet.has(id.toString()));
+      }
+      filter.lab = { $in: scopedLabIds };
+      if (user_id) filter.user = user_id;
+    } else {
+      // teachers/students/external: only own logs
+      filter.user = req.user.id;
     }
     
     // Additional filters
-    if (lab_id) filter.lab = lab_id;
+    if (lab_id) filter.lab = filter.lab ? { $in: (filter.lab.$in || []).filter(x => x.toString() === lab_id.toString()) } : lab_id;
     if (status) filter.status = status;
     
     // For admins and lab managers, if no results with current filters, show all accessible requests
@@ -130,6 +120,18 @@ const getBorrowLogById = async (req, res) => {
         success: false,
         message: 'Borrow log not found'
       });
+    }
+
+    // Department scope enforcement for non-admins
+    if (req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const allowed = (req.departmentScope.labIds || []).some(id => id.toString() === borrowLog.lab._id.toString());
+      if (!allowed && !['teacher','student','external'].includes(req.user.role)) {
+        return res.status(403).json({ success: false, message: 'Access denied: borrow record not in your department' });
+      }
+      // For regular users, they can only access their own record
+      if (['teacher','student','external'].includes(req.user.role) && borrowLog.user._id.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
     }
 
     res.json({
@@ -270,6 +272,15 @@ const approveBorrowRequest = async (req, res) => {
         success: false,
         message: 'Borrow request not found',
       });
+    }
+
+    // Department scope enforcement for non-admin approvers
+    if (req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === borrowLog.lab.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        return res.status(403).json({ success: false, message: 'Access denied: request not in your department' });
+      }
     }
 
     // 3. Check current status
@@ -448,6 +459,15 @@ const rejectBorrowRequest = async (req, res) => {
       });
     }
 
+    // Department scope enforcement for non-admin rejectors
+    if (req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === borrowLog.lab.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        return res.status(403).json({ success: false, message: 'Access denied: request not in your department' });
+      }
+    }
+
     if (borrowLog.status !== 'pending') {
       await session.abortTransaction();
       return res.status(400).json({
@@ -531,6 +551,15 @@ const returnItem = async (req, res) => {
         success: false,
         message: 'Borrow record not found',
       });
+    }
+
+    // Department scope enforcement for non-admin return processors
+    if (req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === borrowLog.lab.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        return res.status(403).json({ success: false, message: 'Access denied: borrow not in your department' });
+      }
     }
 
     if (borrowLog.status !== 'borrowed') {
@@ -737,14 +766,22 @@ const getPendingRequests = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
+    const departmentParam = req.query.department_id || req.query.department;
     
     const filter = { status: 'pending' };
     
-    // If user is a department admin, only show requests from their department
-    if (req.user.role === 'department_admin') {
-      const labs = await Lab.find({ department: req.user.department._id }).select('_id');
-      const labIds = labs.map(l => l._id);
+    // Department scope for lab_manager/department_admin
+    if (['lab_manager', 'department_admin'].includes(req.user.role) && req.departmentScope && !req.departmentScope.global) {
+      let labIds = req.departmentScope.labIds || [];
+      if (departmentParam) {
+        const deptLabIds = await Lab.find({ department: departmentParam }).select('_id');
+        const deptSet = new Set(deptLabIds.map(l => l._id.toString()));
+        labIds = labIds.filter(id => deptSet.has(id.toString()));
+      }
       filter.lab = { $in: labIds };
+    } else if (req.user.role === 'admin' && departmentParam) {
+      const deptLabIds = await Lab.find({ department: departmentParam }).select('_id');
+      filter.lab = { $in: deptLabIds.map(l => l._id) };
     }
     
     const totalCount = await BorrowLog.countDocuments(filter);
@@ -785,17 +822,25 @@ const getOverdueItems = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
+    const departmentParam = req.query.department_id || req.query.department;
     
     const filter = { 
       status: 'borrowed',
       expected_return_date: { $lt: new Date() }
     };
     
-    // If user is a department admin, only show items from their department
-    if (req.user.role === 'department_admin') {
-      const labs = await Lab.find({ department: req.user.department._id }).select('_id');
-      const labIds = labs.map(l => l._id);
+    // Department scope for lab_manager/department_admin
+    if (['lab_manager', 'department_admin'].includes(req.user.role) && req.departmentScope && !req.departmentScope.global) {
+      let labIds = req.departmentScope.labIds || [];
+      if (departmentParam) {
+        const deptLabIds = await Lab.find({ department: departmentParam }).select('_id');
+        const deptSet = new Set(deptLabIds.map(l => l._id.toString()));
+        labIds = labIds.filter(id => deptSet.has(id.toString()));
+      }
       filter.lab = { $in: labIds };
+    } else if (req.user.role === 'admin' && departmentParam) {
+      const deptLabIds = await Lab.find({ department: departmentParam }).select('_id');
+      filter.lab = { $in: deptLabIds.map(l => l._id) };
     }
     
     const totalCount = await BorrowLog.countDocuments(filter);

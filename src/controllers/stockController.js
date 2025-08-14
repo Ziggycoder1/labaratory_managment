@@ -13,6 +13,25 @@ class StockController {
       const { itemId } = req.params;
       const { quantity, reason, notes } = req.body;
       
+      // Department scope enforcement
+      if (req.user.role !== 'admin') {
+        const scope = req.departmentScope;
+        if (!scope || scope.global) {
+          // proceed
+        } else {
+          const itemDoc = await Item.findById(itemId).select('lab');
+          if (!itemDoc) {
+            await stockService.rollback();
+            return res.status(404).json({ success: false, message: 'Item not found' });
+          }
+          const allowed = scope.labIds.some(id => id.toString() === itemDoc.lab.toString());
+          if (!allowed) {
+            await stockService.rollback();
+            return res.status(403).json({ success: false, message: 'Access denied: item not in your department' });
+          }
+        }
+      }
+      
       const item = await stockService.addStock(
         itemId,
         parseFloat(quantity),
@@ -43,6 +62,25 @@ class StockController {
       
       const { itemId } = req.params;
       const { quantity, reason, notes } = req.body;
+      
+      // Department scope enforcement
+      if (req.user.role !== 'admin') {
+        const scope = req.departmentScope;
+        if (!scope || scope.global) {
+          // proceed
+        } else {
+          const itemDoc = await Item.findById(itemId).select('lab');
+          if (!itemDoc) {
+            await stockService.rollback();
+            return res.status(404).json({ success: false, message: 'Item not found' });
+          }
+          const allowed = scope.labIds.some(id => id.toString() === itemDoc.lab.toString());
+          if (!allowed) {
+            await stockService.rollback();
+            return res.status(403).json({ success: false, message: 'Access denied: item not in your department' });
+          }
+        }
+      }
       
       const item = await stockService.removeStock(
         itemId,
@@ -133,6 +171,31 @@ class StockController {
         });
       }
       
+      // Department scope enforcement
+      if (req.user.role !== 'admin') {
+        const scope = req.departmentScope;
+        if (!scope || scope.global) {
+          // proceed
+        } else {
+          const itemDoc = await Item.findById(itemId).select('lab');
+          if (!itemDoc) {
+            if (shouldEndSession) {
+              await session.abortTransaction();
+              await session.endSession();
+            }
+            return res.status(404).json({ success: false, message: 'Item not found' });
+          }
+          const allowed = scope.labIds.some(id => id.toString() === itemDoc.lab.toString());
+          if (!allowed) {
+            if (shouldEndSession) {
+              await session.abortTransaction();
+              await session.endSession();
+            }
+            return res.status(403).json({ success: false, message: 'Access denied: item not in your department' });
+          }
+        }
+      }
+      
       console.log(`Moving item ${itemId} from lab ${source_lab_id} to ${target_lab_id}`, {
         quantity: parseFloat(quantity),
         reason: reason || 'Stock transfer',
@@ -205,6 +268,25 @@ class StockController {
       
       const { itemId } = req.params;
       const { new_quantity, reason, notes } = req.body;
+      
+      // Department scope enforcement
+      if (req.user.role !== 'admin') {
+        const scope = req.departmentScope;
+        if (!scope || scope.global) {
+          // proceed
+        } else {
+          const itemDoc = await Item.findById(itemId).select('lab');
+          if (!itemDoc) {
+            await stockService.rollback();
+            return res.status(404).json({ success: false, message: 'Item not found' });
+          }
+          const allowed = scope.labIds.some(id => id.toString() === itemDoc.lab.toString());
+          if (!allowed) {
+            await stockService.rollback();
+            return res.status(403).json({ success: false, message: 'Access denied: item not in your department' });
+          }
+        }
+      }
       
       const item = await stockService.adjustStock(
         itemId,

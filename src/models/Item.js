@@ -138,7 +138,7 @@ itemSchema.statics.findAll = async function({
   
   // Apply filters
   if (lab_id) {
-    query.lab = lab_id;
+    query.lab = Array.isArray(lab_id) ? { $in: lab_id } : lab_id;
   }
   
   if (type) {

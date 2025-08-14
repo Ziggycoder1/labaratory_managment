@@ -108,21 +108,34 @@ const getAllLabs = async (req, res) => {
       page = 1, 
       limit = 10, 
       search, 
-      department_id, 
       status, 
       available_only, 
       field_id 
     } = req.query;
+    const departmentParam = req.query.department_id || req.query.department;
 
     // Build filter
     const filter = { deleted_at: null };
     console.log('Initial filter:', filter);
     
-    // Apply role-based filtering
-    if (req.user && req.user.role === 'department_admin') {
-      filter.department = req.user.department?._id || req.user.department;
-    } else if (department_id) {
-      filter.department = department_id;
+    // Apply role-based filtering with department scope (only when authenticated)
+    if (req.user) {
+      if (req.user.role === 'admin') {
+        if (departmentParam) filter.department = departmentParam;
+      } else if (['lab_manager', 'department_admin'].includes(req.user.role)) {
+        const labIds = req.departmentScope && !req.departmentScope.global ? (req.departmentScope.labIds || []) : [];
+        if (labIds.length === 0) {
+          // No accessible labs; force empty result
+          filter._id = { $in: [] };
+        } else {
+          filter._id = { $in: labIds };
+        }
+      } else if (departmentParam) {
+        filter.department = departmentParam;
+      }
+    } else if (departmentParam) {
+      // Unauthenticated or other roles: allow explicit department filter
+      filter.department = departmentParam;
     }
 
     // Apply status filters
@@ -278,15 +291,16 @@ const getLabById = async (req, res) => {
       });
     }
 
-    // Check department access for department admins
-    if (req.user.role === 'department_admin' && 
-        lab.department && 
-        lab.department._id.toString() !== req.user.department._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied',
-        errors: ['You do not have permission to access this lab']
-      });
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to access this lab']
+        });
+      }
     }
 
     // Calculate statistics
@@ -431,15 +445,16 @@ const checkLabAvailability = async (req, res) => {
       });
     }
 
-    // Check department admin access
-    if (req.user.role === 'department_admin' && 
-        lab.department && 
-        lab.department._id.toString() !== req.user.department._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied',
-        errors: ['You do not have permission to check availability for this lab']
-      });
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to check availability for this lab']
+        });
+      }
     }
 
     // Check if lab is active
@@ -662,9 +677,9 @@ const createLab = async (req, res) => {
       });
     }
 
-    // Check if user is department admin for this department
-    if (req.user.role === 'department_admin' && 
-        departmentDoc._id.toString() !== req.user.department._id.toString()) {
+    // Check if user is allowed to create in this department (dept admin or lab manager)
+    if (req.user.role !== 'admin' && ['lab_manager','department_admin'].includes(req.user.role) &&
+        departmentDoc._id.toString() !== (req.user.department?._id?.toString() || req.user.department?.toString())) {
       await session.abortTransaction();
       session.endSession();
       return res.status(403).json({
@@ -897,17 +912,18 @@ const updateLab = async (req, res) => {
       });
     }
 
-    // Check department admin access
-    if (req.user.role === 'department_admin' && 
-        existingLab.department && 
-        existingLab.department.toString() !== req.user.department._id.toString()) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied',
-        errors: ['You do not have permission to update this lab']
-      });
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === existingLab._id.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to update this lab']
+        });
+      }
     }
 
     // Check if department is being changed and user has access to new department
@@ -1141,21 +1157,10 @@ const deleteLab = async (req, res) => {
       });
     }
 
-    // Check department admin access
-    if (req.user.role === 'department_admin') {
-      console.log('Checking department admin access...');
-      const departmentMatch = lab.department && 
-                            req.user.department &&
-                            lab.department.toString() === req.user.department._id.toString();
-      
-      console.log('Department access check:', {
-        labDepartment: lab.department,
-        userDepartment: req.user.department?._id,
-        match: departmentMatch ? 'Yes' : 'No'
-      });
-      
-      if (!departmentMatch) {
-        console.log('Department admin access denied');
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
         await session.abortTransaction();
         session.endSession();
         return res.status(403).json({
@@ -1337,6 +1342,20 @@ const updateLabStatus = async (req, res) => {
       });
     }
 
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to update the status of this lab']
+        });
+      }
+    }
+
     // Send notification about status change
     await sendLabNotification(
       lab,
@@ -1457,6 +1476,20 @@ const addEquipmentToLab = async (req, res) => {
         message: 'Lab not found',
         errors: []
       });
+    }
+
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to add equipment to this lab']
+        });
+      }
     }
 
     await session.commitTransaction();
@@ -1612,6 +1645,20 @@ const logMaintenance = async (req, res) => {
       });
     }
 
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to log maintenance for this lab']
+        });
+      }
+    }
+
     await session.commitTransaction();
     session.endSession();
 
@@ -1700,6 +1747,18 @@ const getLabStatistics = async (req, res) => {
         message: 'Lab not found',
         errors: []
       });
+    }
+
+    // Department scope enforcement for non-admins
+    if (req.user && req.user.role !== 'admin' && req.departmentScope && !req.departmentScope.global) {
+      const inScope = (req.departmentScope.labIds || []).some(id => id.toString() === lab._id.toString());
+      if (!inScope) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+          errors: ['You do not have permission to view statistics for this lab']
+        });
+      }
     }
 
     // Calculate booking statistics

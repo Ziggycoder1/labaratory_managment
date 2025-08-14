@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, query, param } = require('express-validator');
 const itemController = require('../controllers/itemController');
-const { auth, checkRole } = require('../middleware/auth.middleware');
+const { auth, checkRole, checkDepartmentAccess } = require('../middleware/auth.middleware');
 
 // Validation middleware
 const validateItem = [
@@ -58,6 +58,7 @@ const validateTransferItem = [
 // GET /api/items - Get all items with pagination and filters
 router.get('/',
     auth,
+    checkDepartmentAccess,
     query('lab_id').optional().isMongoId(),
     query('type').optional().isIn(['consumable', 'non_consumable', 'fixed']),
     query('low_stock').optional().isBoolean(),
@@ -71,6 +72,7 @@ router.get('/',
 // GET /api/items/search - Search items with advanced filters
 router.get('/search',
     auth,
+    checkDepartmentAccess,
     query('q').optional().isString(),
     query('name').optional().isString(),
     query('type').optional().isString(),
@@ -83,6 +85,7 @@ router.get('/search',
 // GET /api/items/low-stock - Get low stock items
 router.get('/low-stock',
     auth,
+    checkDepartmentAccess,
     query('lab_id').optional().isMongoId(),
     itemController.getLowStockItems
 );
@@ -90,6 +93,7 @@ router.get('/low-stock',
 // GET /api/items/expiring - Get expiring items
 router.get('/expiring',
     auth,
+    checkDepartmentAccess,
     query('days').optional().isInt({ min: 1 }),
     query('lab_id').optional().isMongoId(),
     itemController.getExpiringItems
@@ -98,6 +102,7 @@ router.get('/expiring',
 // GET /api/items/:id - Get item by ID
 router.get('/:id',
     auth,
+    checkDepartmentAccess,
     param('id').isMongoId().withMessage('Invalid item ID'),
     itemController.getItemById
 );
@@ -106,6 +111,7 @@ router.get('/:id',
 router.post('/',
     auth,
     checkRole(['admin', 'lab_manager']),
+    checkDepartmentAccess,
     validateItem,
     itemController.createItem
 );
@@ -114,6 +120,7 @@ router.post('/',
 router.put('/:id',
     auth,
     checkRole(['admin', 'lab_manager']),
+    checkDepartmentAccess,
     param('id').isMongoId().withMessage('Invalid item ID'),
     validateItem,
     itemController.updateItem
@@ -123,6 +130,7 @@ router.put('/:id',
 router.delete('/:id',
     auth,
     checkRole(['admin', 'lab_manager']),
+    checkDepartmentAccess,
     param('id').isMongoId().withMessage('Invalid item ID'),
     itemController.softDeleteItem
 );
@@ -131,6 +139,7 @@ router.delete('/:id',
 router.delete('/:id/permanent',
     auth,
     checkRole(['admin']), // Only admin can permanently delete
+    checkDepartmentAccess,
     param('id').isMongoId().withMessage('Invalid item ID'),
     itemController.permanentDeleteItem
 );
@@ -139,6 +148,7 @@ router.delete('/:id/permanent',
 router.post('/:id/adjust',
     auth,
     checkRole(['admin', 'lab_manager']),
+    checkDepartmentAccess,
     param('id').isMongoId().withMessage('Invalid item ID'),
     validateStockAdjustment,
     itemController.adjustStock
@@ -148,6 +158,7 @@ router.post('/:id/adjust',
 router.post('/transfer',
     auth,
     checkRole(['admin', 'lab_manager', 'department_admin']),
+    checkDepartmentAccess,
     validateTransferItem,
     itemController.transferItem
 );
@@ -156,6 +167,7 @@ router.post('/transfer',
 router.post('/:id/move',
     auth,
     checkRole(['admin', 'lab_manager', 'department_admin']),
+    checkDepartmentAccess,
     param('id').isMongoId().withMessage('Invalid item ID'),
     validateMoveItem,
     itemController.moveItem
