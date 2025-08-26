@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { Types: { ObjectId } } = mongoose;
+const ErrorResponse = require('../utils/errorResponse');
 const Booking = require('../models/Booking');
 const Lab = require('../models/Lab');
 const Field = require('../models/Field');
@@ -124,7 +125,8 @@ const getAllBookings = async (req, res) => {
       })),
       created_at: b.createdAt ? new Date(b.createdAt).toISOString() : null,
       approved_at: b.approved_at ? new Date(b.approved_at).toISOString() : null,
-      approved_by: b.approved_by?.full_name || null
+      approved_by: b.approved_by?.full_name || null,
+      participants_count: b.participants_count || 0
     }));
 
     res.json({
