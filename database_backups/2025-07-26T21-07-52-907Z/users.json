@@ -1,0 +1,232 @@
+[
+  {
+    "_id": "68571f3077111e109ac1d77c",
+    "full_name": "Gilbert Byiringiro",
+    "email": "julesbyiringiro5@gmail.com",
+    "password": "$2a$10$IPFFbnEpR/0fSZ7HrJViD.Eb.yGbaX0pMQVFLPT6ND2FCYhUI8YKa",
+    "role": "admin",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": true,
+    "created_at": "2025-06-21T21:08:00.769Z",
+    "updated_at": "2025-07-26T19:45:31.953Z",
+    "__v": 0,
+    "last_login": "2025-07-26T19:45:31.919Z",
+    "notification_settings": {
+      "email_notifications": true,
+      "notification_types": {
+        "booking_approved": true,
+        "booking_rejected": true,
+        "maintenance_reminder": true,
+        "return_reminder": true,
+        "stock_alert": false
+      },
+      "push_notifications": true,
+      "reminder_preferences": {
+        "booking_reminder_hours": 2,
+        "return_reminder_hours": 24
+      }
+    },
+    "phone": "0781529839"
+  },
+  {
+    "_id": "6857200177111e109ac1d785",
+    "full_name": "Gilbert Byiringiro",
+    "email": "julesbyiringiro2@gmail.com",
+    "password": "$2a$10$DtHD.h/rSNp51bQzBIKdeO.X2yUFECJIcbmdTZxMEVj31YABgNYxO",
+    "role": "teacher",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": true,
+    "created_at": "2025-06-21T21:11:29.463Z",
+    "updated_at": "2025-06-21T21:11:29.463Z",
+    "__v": 0
+  },
+  {
+    "_id": "6857215977111e109ac1d78f",
+    "full_name": "Gilbert Byiringiro",
+    "email": "julesbyiringiro3@gmail.com",
+    "password": "$2a$10$ugDSmOcQdnYreuGHLkF82OjHQnSmvCGO6Dv8BM7pbdE7FqD24ZD0i",
+    "role": "student",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": false,
+    "created_at": "2025-06-21T21:17:13.474Z",
+    "updated_at": "2025-06-27T08:14:04.814Z",
+    "__v": 0
+  },
+  {
+    "_id": "6857233777111e109ac1d797",
+    "full_name": "Gilbert Byiringiro",
+    "email": "julesbyiringiro1@gmail.com",
+    "password": "$2a$10$6GqLkBRS/FCgeC.8xtXsjOmMh6pTgQCPWbQ5GejgnCHdVT89x2K5.",
+    "role": "student",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": false,
+    "created_at": "2025-06-21T21:25:11.667Z",
+    "updated_at": "2025-06-27T08:12:30.411Z",
+    "__v": 0
+  },
+  {
+    "_id": "68572efe48c436e8cbfd6f4b",
+    "full_name": "Gilbert Byiringiro",
+    "email": "jules@gmail.com",
+    "password": "$2a$10$DM0FwZlXp/1D8/zi1R3beOndO5EkX9DtaqUDYzHQA.UkfPwJqiyZu",
+    "role": "admin",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": false,
+    "created_at": "2025-06-21T22:15:26.610Z",
+    "updated_at": "2025-06-27T08:12:13.357Z",
+    "__v": 0,
+    "last_login": "2025-06-22T10:59:49.725Z"
+  },
+  {
+    "_id": "68592c615698fd40585e19c2",
+    "full_name": "richard ziggy",
+    "email": "twagirayezurichard2020@gmail.com",
+    "password": "$2a$10$TuWFZeu5iN0U7LpokLbge.QkIbxUPUPkv05lWXxGXYux.q0hLdMiS",
+    "role": "lab_manager",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": false,
+    "created_at": "2025-06-23T10:28:49.061Z",
+    "updated_at": "2025-07-03T16:42:00.441Z",
+    "__v": 0,
+    "last_login": "2025-06-24T11:22:11.142Z"
+  },
+  {
+    "_id": "68600797d44f5fd1a74d5627",
+    "full_name": "GAKURU Pierre",
+    "email": "gakuru@gmail.com",
+    "password": "$2a$10$y2bX6JADEoJK11s81LLyzeD2QAlVTqfcNqdZJn/3kVi.7aUvrNBWi",
+    "role": "lab_manager",
+    "department": "685ecd98092debcb2b5eea31",
+    "is_active": true,
+    "notification_settings": {
+      "notification_types": {
+        "booking_approved": true,
+        "booking_rejected": true,
+        "return_reminder": true,
+        "stock_alert": false,
+        "maintenance_reminder": true
+      },
+      "reminder_preferences": {
+        "return_reminder_hours": 24,
+        "booking_reminder_hours": 2
+      },
+      "email_notifications": true,
+      "push_notifications": true
+    },
+    "created_at": "2025-06-28T15:17:43.304Z",
+    "updated_at": "2025-07-21T11:51:47.576Z",
+    "__v": 0,
+    "last_login": "2025-06-28T15:17:57.837Z"
+  },
+  {
+    "_id": "6877c68282f12ada6f5f843a",
+    "full_name": "Agasaro Keza Douce",
+    "email": "keza@gmail.com",
+    "password": "$2a$10$g9L43VJ5TAEm8VionsFPvOHXLOICVh0yxL5DPYt5e9T7QyL4MLaq.",
+    "role": "student",
+    "department": "685ecd98092debcb2b5eea31",
+    "is_active": true,
+    "notification_settings": {
+      "notification_types": {
+        "booking_approved": true,
+        "booking_rejected": true,
+        "return_reminder": true,
+        "stock_alert": false,
+        "maintenance_reminder": true
+      },
+      "reminder_preferences": {
+        "return_reminder_hours": 24,
+        "booking_reminder_hours": 2
+      },
+      "email_notifications": true,
+      "push_notifications": true
+    },
+    "created_at": "2025-07-16T15:34:26.485Z",
+    "updated_at": "2025-07-16T15:34:45.664Z",
+    "__v": 0,
+    "last_login": "2025-07-16T15:34:45.658Z"
+  },
+  {
+    "_id": "687c25e95716e3fea6063d93",
+    "full_name": "jule",
+    "email": "jule@gmail.com",
+    "password": "$2a$10$JjND7g.td7OF9G4L5vlWKO4OsztC34ACY2dCHoUoGToEB.XP6jnTa",
+    "role": "external",
+    "department": "685ecd98092debcb2b5eea31",
+    "is_active": true,
+    "notification_settings": {
+      "notification_types": {
+        "booking_approved": true,
+        "booking_rejected": true,
+        "return_reminder": true,
+        "stock_alert": false,
+        "maintenance_reminder": true
+      },
+      "reminder_preferences": {
+        "return_reminder_hours": 24,
+        "booking_reminder_hours": 2
+      },
+      "email_notifications": true,
+      "push_notifications": true
+    },
+    "created_at": "2025-07-19T23:10:33.396Z",
+    "updated_at": "2025-07-21T14:14:48.298Z",
+    "__v": 0,
+    "last_login": "2025-07-21T14:14:48.297Z"
+  },
+  {
+    "_id": "687f7d43844052ca8143d3ad",
+    "full_name": "rich",
+    "email": "richtwagirayezu123@gmail.com",
+    "password": "$2a$10$zwNqhoNT8galJ2gGq.PRfuAFG4riZbBiN.MaFFTjxBkiFlpeTv1Qu",
+    "role": "student",
+    "department": "685ecd98092debcb2b5eea31",
+    "is_active": true,
+    "notification_settings": {
+      "notification_types": {
+        "booking_approved": true,
+        "booking_rejected": true,
+        "return_reminder": true,
+        "stock_alert": false,
+        "maintenance_reminder": true
+      },
+      "reminder_preferences": {
+        "return_reminder_hours": 24,
+        "booking_reminder_hours": 2
+      },
+      "email_notifications": true,
+      "push_notifications": true
+    },
+    "created_at": "2025-07-22T12:00:03.483Z",
+    "updated_at": "2025-07-22T14:32:48.589Z",
+    "__v": 0,
+    "last_login": "2025-07-22T14:32:48.587Z"
+  },
+  {
+    "_id": "687f8166844052ca8143d4a3",
+    "full_name": "Logan",
+    "email": "aimepatrick2003@gmail.com",
+    "password": "$2a$10$7UqyjtKL9UyMp.Ej89khJeguwNcDaTMkPmLoFJP3kw8O5U.Idriq.",
+    "role": "lab_manager",
+    "department": "6856f5ea48f19e6da6f667a8",
+    "is_active": true,
+    "notification_settings": {
+      "notification_types": {
+        "booking_approved": true,
+        "booking_rejected": true,
+        "return_reminder": true,
+        "stock_alert": false,
+        "maintenance_reminder": true
+      },
+      "reminder_preferences": {
+        "return_reminder_hours": 24,
+        "booking_reminder_hours": 2
+      },
+      "email_notifications": true,
+      "push_notifications": true
+    },
+    "created_at": "2025-07-22T12:17:42.278Z",
+    "updated_at": "2025-07-22T12:17:42.278Z",
+    "__v": 0
+  }
+]

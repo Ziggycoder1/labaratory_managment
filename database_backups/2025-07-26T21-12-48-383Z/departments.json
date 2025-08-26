@@ -1,0 +1,29 @@
+[
+  {
+    "_id": "6856f5ea48f19e6da6f667a8",
+    "name": "Dental Therapy",
+    "code": "DTS",
+    "description": "Description of new department",
+    "createdAt": "2025-06-21T18:11:54.483Z",
+    "updatedAt": "2025-06-26T13:03:30.605Z",
+    "__v": 0
+  },
+  {
+    "_id": "685ecd98092debcb2b5eea31",
+    "name": "Biomedical Laboratory Sciences",
+    "code": "BLS",
+    "description": "Biomedical Laboratory Sciences",
+    "createdAt": "2025-06-27T16:58:00.947Z",
+    "updatedAt": "2025-06-27T16:58:00.947Z",
+    "__v": 0
+  },
+  {
+    "_id": "687facb1844052ca8143d81a",
+    "name": "Molecular biology",
+    "code": "MB",
+    "description": "DNA",
+    "createdAt": "2025-07-22T15:22:25.859Z",
+    "updatedAt": "2025-07-22T15:22:25.859Z",
+    "__v": 0
+  }
+]

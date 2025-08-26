@@ -1,0 +1,147 @@
+[
+  {
+    "_id": "685cfa22de3553586e3c0e75",
+    "name": "Computer Science",
+    "code": "CS",
+    "description": "Computer Science field",
+    "createdAt": "2025-06-26T07:43:30.303Z",
+    "updatedAt": "2025-06-26T07:43:30.303Z",
+    "__v": 0
+  },
+  {
+    "_id": "685eeffd03e790d97f5a5b18",
+    "name": "funji",
+    "code": "FUNJI",
+    "createdAt": "2025-06-27T19:24:45.297Z",
+    "updatedAt": "2025-06-27T19:24:45.297Z",
+    "__v": 0
+  },
+  {
+    "_id": "685ef1beb880c44c908007f6",
+    "name": "mora",
+    "code": "MORA",
+    "createdAt": "2025-06-27T19:32:14.500Z",
+    "updatedAt": "2025-06-27T19:32:14.500Z",
+    "__v": 0
+  },
+  {
+    "_id": "685ef1cbb880c44c908007fb",
+    "name": "dental",
+    "code": "DENTAL",
+    "createdAt": "2025-06-27T19:32:27.097Z",
+    "updatedAt": "2025-06-27T19:32:27.097Z",
+    "__v": 0
+  },
+  {
+    "_id": "686006aed44f5fd1a74d55cc",
+    "name": "fdsa",
+    "code": "FDSA",
+    "createdAt": "2025-06-28T15:13:50.460Z",
+    "updatedAt": "2025-06-28T15:13:50.460Z",
+    "__v": 0
+  },
+  {
+    "_id": "686a316bbdbf3c5652f0cb1b",
+    "name": "Dermatology",
+    "code": "DERMATOLOGY",
+    "createdAt": "2025-07-06T08:18:51.451Z",
+    "updatedAt": "2025-07-06T08:18:51.451Z",
+    "__v": 0
+  },
+  {
+    "_id": "686a317abdbf3c5652f0cb20",
+    "name": "Parasitology",
+    "code": "PARASITOLOGY",
+    "createdAt": "2025-07-06T08:19:06.179Z",
+    "updatedAt": "2025-07-06T08:19:06.179Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb3c47a18803c6d50e73f",
+    "name": "Microbiology",
+    "code": "MICROBIOLOGY",
+    "createdAt": "2025-07-07T11:47:16.677Z",
+    "updatedAt": "2025-07-07T11:47:16.677Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb3d77a18803c6d50e744",
+    "name": "Molecular Biology",
+    "code": "MOLECULAR-BIOLOGY",
+    "createdAt": "2025-07-07T11:47:35.895Z",
+    "updatedAt": "2025-07-07T11:47:35.895Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb4ea7a18803c6d50e7b3",
+    "name": "Clinical Chemistry",
+    "code": "CLINICAL-CHEMISTRY",
+    "createdAt": "2025-07-07T11:52:10.388Z",
+    "updatedAt": "2025-07-07T11:52:10.388Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb4fc7a18803c6d50e7b8",
+    "name": "Hematology",
+    "code": "HEMATOLOGY",
+    "createdAt": "2025-07-07T11:52:28.301Z",
+    "updatedAt": "2025-07-07T11:52:28.301Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb50c7a18803c6d50e7bd",
+    "name": "Blood Banking",
+    "code": "BLOOD-BANKING",
+    "createdAt": "2025-07-07T11:52:44.445Z",
+    "updatedAt": "2025-07-07T11:52:44.445Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb5867a18803c6d50e7e0",
+    "name": "Genetics",
+    "code": "GENETICS",
+    "createdAt": "2025-07-07T11:54:46.615Z",
+    "updatedAt": "2025-07-07T11:54:46.615Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb58e7a18803c6d50e7e5",
+    "name": "Research",
+    "code": "RESEARCH",
+    "createdAt": "2025-07-07T11:54:54.316Z",
+    "updatedAt": "2025-07-07T11:54:54.316Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb5ef7a18803c6d50e808",
+    "name": "Operative Dentistry",
+    "code": "OPERATIVE-DENTISTRY",
+    "createdAt": "2025-07-07T11:56:31.456Z",
+    "updatedAt": "2025-07-07T11:56:31.456Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb5fd7a18803c6d50e80d",
+    "name": "Prosthodontics",
+    "code": "PROSTHODONTICS",
+    "createdAt": "2025-07-07T11:56:45.944Z",
+    "updatedAt": "2025-07-07T11:56:45.944Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb60e7a18803c6d50e812",
+    "name": "Periodontics",
+    "code": "PERIODONTICS",
+    "createdAt": "2025-07-07T11:57:02.175Z",
+    "updatedAt": "2025-07-07T11:57:02.175Z",
+    "__v": 0
+  },
+  {
+    "_id": "686bb6197a18803c6d50e817",
+    "name": "Oral Surgery",
+    "code": "ORAL-SURGERY",
+    "createdAt": "2025-07-07T11:57:13.954Z",
+    "updatedAt": "2025-07-07T11:57:13.954Z",
+    "__v": 0
+  }
+]

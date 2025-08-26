@@ -1,0 +1,381 @@
+[
+  {
+    "_id": "685cfad1de3553586e3c0e94",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_request",
+    "title": "New Booking Request",
+    "message": "richard ziggy booked dentistelab for Advanced organic chemistry research experiment",
+    "data": {
+      "booking_id": "685cfad0de3553586e3c0e8b",
+      "lab_name": "dentistelab",
+      "start_time": "2025-06-26T10:00:00.000Z"
+    },
+    "is_read": true,
+    "priority": "normal",
+    "action_url": "/bookings/685cfad0de3553586e3c0e8b",
+    "created_at": "2025-06-26T07:46:25.128Z",
+    "__v": 0,
+    "updatedAt": "2025-07-13T15:31:02.386Z"
+  },
+  {
+    "_id": "685cfad1de3553586e3c0e96",
+    "user": "68572efe48c436e8cbfd6f4b",
+    "type": "booking_request",
+    "title": "New Booking Request",
+    "message": "richard ziggy booked dentistelab for Advanced organic chemistry research experiment",
+    "data": {
+      "booking_id": "685cfad0de3553586e3c0e8b",
+      "lab_name": "dentistelab",
+      "start_time": "2025-06-26T10:00:00.000Z"
+    },
+    "is_read": false,
+    "priority": "normal",
+    "action_url": "/bookings/685cfad0de3553586e3c0e8b",
+    "created_at": "2025-06-26T07:46:25.232Z",
+    "__v": 0
+  },
+  {
+    "_id": "685cfad1de3553586e3c0e98",
+    "user": "685a8cca0f474f2ee10374ac",
+    "type": "booking_request",
+    "title": "New Booking Request",
+    "message": "richard ziggy booked dentistelab for Advanced organic chemistry research experiment",
+    "data": {
+      "booking_id": "685cfad0de3553586e3c0e8b",
+      "lab_name": "dentistelab",
+      "start_time": "2025-06-26T10:00:00.000Z"
+    },
+    "is_read": false,
+    "priority": "normal",
+    "action_url": "/bookings/685cfad0de3553586e3c0e8b",
+    "created_at": "2025-06-26T07:46:25.336Z",
+    "__v": 0
+  },
+  {
+    "_id": "6868ff5eed510aa1432ca281",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "stock_out",
+    "title": "Item out of_stock",
+    "message": "Sylinger is now out of_stock in lab 685fd86db284c4baf9158515",
+    "is_read": true,
+    "created_at": "2025-07-05T10:33:02.416Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 0,
+      "minimumQuantity": 1,
+      "expiryDate": "2025-07-31T00:00:00.000Z"
+    },
+    "createdAt": "2025-07-05T10:33:02.419Z",
+    "updatedAt": "2025-07-13T15:31:02.380Z",
+    "__v": 0
+  },
+  {
+    "_id": "6868ff5ded510aa1432ca275",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "stock_out",
+    "title": "Item out of_stock",
+    "message": "Sylinger is now out of_stock in lab 6868d41c738bc4fc1755be7c",
+    "is_read": true,
+    "created_at": "2025-07-05T10:33:01.033Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 0,
+      "minimumQuantity": 1,
+      "expiryDate": "2025-07-31T00:00:00.000Z"
+    },
+    "createdAt": "2025-07-05T10:33:01.037Z",
+    "updatedAt": "2025-07-13T15:31:02.376Z",
+    "__v": 0
+  },
+  {
+    "_id": "6868ffaeed510aa1432ca2b9",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "low_stock",
+    "title": "Item low stock",
+    "message": "Sylinger is now low stock in lab 6868d41c738bc4fc1755be7c",
+    "is_read": true,
+    "created_at": "2025-07-05T10:34:22.861Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 1,
+      "minimumQuantity": 1,
+      "expiryDate": "2025-07-31T00:00:00.000Z"
+    },
+    "createdAt": "2025-07-05T10:34:22.862Z",
+    "updatedAt": "2025-07-13T15:31:02.383Z",
+    "__v": 0
+  },
+  {
+    "_id": "686901f0dde92666fd3f35e7",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "stock_out",
+    "title": "Item out of_stock",
+    "message": "Sylinger is now out of_stock in lab 685fd86db284c4baf9158515",
+    "is_read": true,
+    "created_at": "2025-07-05T10:44:00.868Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 0,
+      "minimumQuantity": 1,
+      "expiryDate": "2025-07-31T00:00:00.000Z"
+    },
+    "createdAt": "2025-07-05T10:44:00.870Z",
+    "updatedAt": "2025-07-13T15:31:02.364Z",
+    "__v": 0
+  },
+  {
+    "_id": "68690421f271821c01bdf546",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "low_stock",
+    "title": "Item low stock",
+    "message": "Gilbert Byiringiro Lab is now low stock in lab 685fd86db284c4baf9158515",
+    "is_read": true,
+    "created_at": "2025-07-05T10:53:21.773Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 1,
+      "minimumQuantity": 1,
+      "expiryDate": "2025-07-23T00:00:00.000Z"
+    },
+    "createdAt": "2025-07-05T10:53:21.776Z",
+    "updatedAt": "2025-07-13T15:31:02.354Z",
+    "__v": 0
+  },
+  {
+    "_id": "68789dc820ee788b472cdeaa",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_request",
+    "title": "🔔 New Lab Booking Request",
+    "message": "Gilbert Byiringiro has requested to book Histotechnology Laboratory from 7/17/2025, 8:57:00 AM to 7/17/2025, 8:57:00 PM",
+    "data": "{\"booking_id\":\"68789dc720ee788b472cde9d\",\"lab_id\":\"686bb5937a18803c6d50e7ec\",\"lab_name\":\"Histotechnology Laboratory\",\"start_time\":\"2025-07-17T06:57:00.000Z\",\"end_time\":\"2025-07-17T18:57:00.000Z\",\"purpose\":\"No purpose specified\",\"requester_id\":\"68571f3077111e109ac1d77c\",\"requester_name\":\"Gilbert Byiringiro\",\"requester_email\":\"julesbyiringiro5@gmail.com\",\"status\":\"pending_review\",\"created_at\":\"2025-07-17T06:52:56.453Z\",\"formatted_start_time\":\"7/17/2025, 8:57:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:57:00 PM\"}",
+    "is_read": true,
+    "created_at": "2025-07-17T06:52:56.455Z",
+    "priority": "high",
+    "action_url": "/admin/bookings/68789dc720ee788b472cde9d",
+    "related_lab": "686bb5937a18803c6d50e7ec",
+    "metadata": {
+      "lab_id": "686bb5937a18803c6d50e7ec",
+      "lab_name": "Histotechnology Laboratory",
+      "lab_code": "HLAB"
+    },
+    "createdAt": "2025-07-17T06:52:56.462Z",
+    "updatedAt": "2025-07-17T12:00:30.949Z",
+    "__v": 0
+  },
+  {
+    "_id": "68789dc820ee788b472cdeab",
+    "user": "68572efe48c436e8cbfd6f4b",
+    "type": "booking_request",
+    "title": "🔔 New Lab Booking Request",
+    "message": "Gilbert Byiringiro has requested to book Histotechnology Laboratory from 7/17/2025, 8:57:00 AM to 7/17/2025, 8:57:00 PM",
+    "data": "{\"booking_id\":\"68789dc720ee788b472cde9d\",\"lab_id\":\"686bb5937a18803c6d50e7ec\",\"lab_name\":\"Histotechnology Laboratory\",\"start_time\":\"2025-07-17T06:57:00.000Z\",\"end_time\":\"2025-07-17T18:57:00.000Z\",\"purpose\":\"No purpose specified\",\"requester_id\":\"68571f3077111e109ac1d77c\",\"requester_name\":\"Gilbert Byiringiro\",\"requester_email\":\"julesbyiringiro5@gmail.com\",\"status\":\"pending_review\",\"created_at\":\"2025-07-17T06:52:56.457Z\",\"formatted_start_time\":\"7/17/2025, 8:57:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:57:00 PM\"}",
+    "is_read": false,
+    "created_at": "2025-07-17T06:52:56.458Z",
+    "priority": "high",
+    "action_url": "/admin/bookings/68789dc720ee788b472cde9d",
+    "related_lab": "686bb5937a18803c6d50e7ec",
+    "metadata": {
+      "lab_id": "686bb5937a18803c6d50e7ec",
+      "lab_name": "Histotechnology Laboratory",
+      "lab_code": "HLAB"
+    },
+    "createdAt": "2025-07-17T06:52:56.462Z",
+    "updatedAt": "2025-07-17T06:52:56.462Z",
+    "__v": 0
+  },
+  {
+    "_id": "6878a00918a8f2042cda2a96",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_rejected",
+    "title": "❌ Booking Declined: Histotechnology Laboratory",
+    "message": "We regret to inform you that your booking request for Histotechnology Laboratory has been declined.\n\n📅 Requested Date: Thu Jul 17 2025\n⏰ Time: 8:57:00 AM - 8:57:00 PM\n\nReason: its not allowed\n\nPlease contact the lab administrator if you have any questions or would like to request a different time.",
+    "data": "{\"booking_id\":\"68789dc720ee788b472cde9d\",\"lab_id\":\"686bb5937a18803c6d50e7ec\",\"lab_name\":\"Histotechnology Laboratory\",\"start_time\":\"2025-07-17T06:57:00.000Z\",\"end_time\":\"2025-07-17T18:57:00.000Z\",\"formatted_start_time\":\"7/17/2025, 8:57:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:57:00 PM\",\"duration_hours\":12,\"purpose\":\"Not specified\",\"status\":\"rejected\",\"status_updated_at\":\"2025-07-17T07:02:33.082Z\",\"action_required\":\"You may want to request a different time slot or contact the lab administrator.\",\"updated_by\":{\"id\":\"68571f3077111e109ac1d77c\",\"name\":\"Gilbert Byiringiro\"}}",
+    "is_read": true,
+    "created_at": "2025-07-17T07:02:33.083Z",
+    "priority": "high",
+    "action_url": "/bookings/68789dc720ee788b472cde9d",
+    "related_lab": "686bb5937a18803c6d50e7ec",
+    "metadata": {
+      "lab_id": "686bb5937a18803c6d50e7ec",
+      "lab_name": "Histotechnology Laboratory",
+      "lab_code": "HLAB",
+      "lab_department": "",
+      "status": "rejected",
+      "updated_by": "68571f3077111e109ac1d77c"
+    },
+    "createdAt": "2025-07-17T07:02:33.085Z",
+    "updatedAt": "2025-07-18T11:18:31.679Z",
+    "__v": 0
+  },
+  {
+    "_id": "6878a03918a8f2042cda2aea",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_approved",
+    "title": "✅ Booking Confirmed: Microbiology and Parasitology Lab",
+    "message": "Your booking for Microbiology and Parasitology Lab has been approved.\n📅 Date: Thu Jul 17 2025\n⏰ Time: 8:50:00 AM - 8:51:00 AM (0 hours)\n📍 Location: Microbiology and Parasitology Lab\n📝 Purpose: Not specified",
+    "data": "{\"booking_id\":\"68789cfc254070d330c86371\",\"lab_id\":\"686bb3fd7a18803c6d50e74b\",\"lab_name\":\"Microbiology and Parasitology Lab\",\"start_time\":\"2025-07-17T06:50:00.000Z\",\"end_time\":\"2025-07-17T06:51:00.000Z\",\"formatted_start_time\":\"7/17/2025, 8:50:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:51:00 AM\",\"duration_hours\":0,\"purpose\":\"Not specified\",\"status\":\"approved\",\"status_updated_at\":\"2025-07-17T07:03:21.631Z\",\"action_required\":\"Please arrive on time and check in with the lab staff.\",\"updated_by\":{\"id\":\"68571f3077111e109ac1d77c\",\"name\":\"Gilbert Byiringiro\"}}",
+    "is_read": true,
+    "created_at": "2025-07-17T07:03:21.633Z",
+    "priority": "high",
+    "action_url": "/bookings/68789cfc254070d330c86371",
+    "related_lab": "686bb3fd7a18803c6d50e74b",
+    "metadata": {
+      "lab_id": "686bb3fd7a18803c6d50e74b",
+      "lab_name": "Microbiology and Parasitology Lab",
+      "lab_code": "MPL",
+      "lab_department": "",
+      "status": "approved",
+      "updated_by": "68571f3077111e109ac1d77c"
+    },
+    "createdAt": "2025-07-17T07:03:21.637Z",
+    "updatedAt": "2025-07-18T11:18:31.679Z",
+    "__v": 0
+  },
+  {
+    "_id": "6878a3e211b5310e17b614c4",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_completed",
+    "title": "✅ Booking Completed",
+    "message": "Your booking for Microbiology and Parasitology Lab on Thu Jul 17 2025 has been marked as completed.",
+    "data": "{\"booking_id\":\"68789cfc254070d330c86371\",\"lab_id\":\"686bb3fd7a18803c6d50e74b\",\"lab_name\":\"Microbiology and Parasitology Lab\",\"completed_by\":\"68571f3077111e109ac1d77c\",\"completed_at\":\"2025-07-17T07:18:58.611Z\",\"booking_details\":{\"start_time\":\"2025-07-17T06:50:00.000Z\",\"end_time\":\"2025-07-17T06:51:00.000Z\",\"formatted_start_time\":\"7/17/2025, 8:50:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:51:00 AM\",\"duration_hours\":0,\"purpose\":\"Not specified\"},\"completion_notes\":\"No completion notes provided\"}",
+    "is_read": true,
+    "created_at": "2025-07-17T07:18:58.613Z",
+    "priority": "normal",
+    "action_url": "/bookings/68789cfc254070d330c86371",
+    "related_lab": "686bb3fd7a18803c6d50e74b",
+    "metadata": {
+      "lab_id": "686bb3fd7a18803c6d50e74b",
+      "lab_name": "Microbiology and Parasitology Lab",
+      "lab_code": "",
+      "status": "completed",
+      "updated_by": "68571f3077111e109ac1d77c",
+      "completed_at": "2025-07-17T07:18:58.611Z"
+    },
+    "createdAt": "2025-07-17T07:18:58.619Z",
+    "updatedAt": "2025-07-18T11:18:31.679Z",
+    "__v": 0
+  },
+  {
+    "_id": "6878a4218c812f1b54186607",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_completed",
+    "title": "✅ Booking Completed",
+    "message": "Your booking for Microbiology and Parasitology Lab on Thu Jul 17 2025 has been marked as completed.",
+    "data": "{\"booking_id\":\"68789cfc254070d330c86371\",\"lab_id\":\"686bb3fd7a18803c6d50e74b\",\"lab_name\":\"Microbiology and Parasitology Lab\",\"completed_by\":\"68571f3077111e109ac1d77c\",\"completed_at\":\"2025-07-17T07:20:01.060Z\",\"booking_details\":{\"start_time\":\"2025-07-17T06:50:00.000Z\",\"end_time\":\"2025-07-17T06:51:00.000Z\",\"formatted_start_time\":\"7/17/2025, 8:50:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:51:00 AM\",\"duration_hours\":0,\"purpose\":\"Not specified\"},\"completion_notes\":\"No completion notes provided\"}",
+    "is_read": true,
+    "created_at": "2025-07-17T07:20:01.063Z",
+    "priority": "normal",
+    "action_url": "/bookings/68789cfc254070d330c86371",
+    "related_lab": "686bb3fd7a18803c6d50e74b",
+    "metadata": {
+      "lab_id": "686bb3fd7a18803c6d50e74b",
+      "lab_name": "Microbiology and Parasitology Lab",
+      "lab_code": "",
+      "status": "completed",
+      "updated_by": "68571f3077111e109ac1d77c",
+      "completed_at": "2025-07-17T07:20:01.060Z"
+    },
+    "createdAt": "2025-07-17T07:20:01.068Z",
+    "updatedAt": "2025-07-18T10:50:22.236Z",
+    "__v": 0
+  },
+  {
+    "_id": "6878a57e8c812f1b54186690",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_approved",
+    "title": "✅ Booking Confirmed: Clinical Chemistry and Hematology Lab",
+    "message": "Your booking for Clinical Chemistry and Hematology Lab has been approved.\n📅 Date: Thu Jul 17 2025\n⏰ Time: 8:48:00 AM - 8:46:00 PM (12 hours)\n📍 Location: Clinical Chemistry and Hematology Lab\n📝 Purpose: Not specified",
+    "data": "{\"booking_id\":\"68789bc58666659163d138ad\",\"lab_id\":\"686bb5127a18803c6d50e7c4\",\"lab_name\":\"Clinical Chemistry and Hematology Lab\",\"start_time\":\"2025-07-17T06:48:00.000Z\",\"end_time\":\"2025-07-17T18:46:00.000Z\",\"formatted_start_time\":\"7/17/2025, 8:48:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:46:00 PM\",\"duration_hours\":12,\"purpose\":\"Not specified\",\"status\":\"approved\",\"status_updated_at\":\"2025-07-17T07:25:50.369Z\",\"action_required\":\"Please arrive on time and check in with the lab staff.\",\"updated_by\":{\"id\":\"68571f3077111e109ac1d77c\",\"name\":\"Gilbert Byiringiro\"}}",
+    "is_read": true,
+    "created_at": "2025-07-17T07:25:50.372Z",
+    "priority": "high",
+    "action_url": "/bookings/68789bc58666659163d138ad",
+    "related_lab": "686bb5127a18803c6d50e7c4",
+    "metadata": {
+      "lab_id": "686bb5127a18803c6d50e7c4",
+      "lab_name": "Clinical Chemistry and Hematology Lab",
+      "lab_code": "CCHL",
+      "lab_department": "",
+      "status": "approved",
+      "updated_by": "68571f3077111e109ac1d77c"
+    },
+    "createdAt": "2025-07-17T07:25:50.379Z",
+    "updatedAt": "2025-07-17T12:53:52.236Z",
+    "__v": 0
+  },
+  {
+    "_id": "6878a5938c812f1b541866e3",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "booking_completed",
+    "title": "✅ Booking Completed",
+    "message": "Your booking for Clinical Chemistry and Hematology Lab on Thu Jul 17 2025 has been marked as completed.",
+    "data": "{\"booking_id\":\"68789bc58666659163d138ad\",\"lab_id\":\"686bb5127a18803c6d50e7c4\",\"lab_name\":\"Clinical Chemistry and Hematology Lab\",\"completed_by\":\"68571f3077111e109ac1d77c\",\"completed_at\":\"2025-07-17T07:26:11.176Z\",\"booking_details\":{\"start_time\":\"2025-07-17T06:48:00.000Z\",\"end_time\":\"2025-07-17T18:46:00.000Z\",\"formatted_start_time\":\"7/17/2025, 8:48:00 AM\",\"formatted_end_time\":\"7/17/2025, 8:46:00 PM\",\"duration_hours\":12,\"purpose\":\"Not specified\"},\"completion_notes\":\"No completion notes provided\"}",
+    "is_read": true,
+    "created_at": "2025-07-17T07:26:11.180Z",
+    "priority": "normal",
+    "action_url": "/bookings/68789bc58666659163d138ad",
+    "related_lab": "686bb5127a18803c6d50e7c4",
+    "metadata": {
+      "lab_id": "686bb5127a18803c6d50e7c4",
+      "lab_name": "Clinical Chemistry and Hematology Lab",
+      "lab_code": "",
+      "status": "completed",
+      "updated_by": "68571f3077111e109ac1d77c",
+      "completed_at": "2025-07-17T07:26:11.176Z"
+    },
+    "createdAt": "2025-07-17T07:26:11.186Z",
+    "updatedAt": "2025-07-17T11:59:15.056Z",
+    "__v": 0
+  },
+  {
+    "_id": "687a50e4e8f1c168e45a318f",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "low_stock",
+    "title": "Item low stock",
+    "message": "Compound Microscope is now low stock in lab 686bb5127a18803c6d50e7c4",
+    "is_read": true,
+    "created_at": "2025-07-18T13:49:24.518Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 2,
+      "minimumQuantity": 2
+    },
+    "createdAt": "2025-07-18T13:49:24.531Z",
+    "updatedAt": "2025-07-19T18:21:49.998Z",
+    "__v": 0
+  },
+  {
+    "_id": "687fb29e844052ca8143d9b0",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "low_stock",
+    "title": "Item low stock",
+    "message": "Water Bath is now low stock in lab 686bb5937a18803c6d50e7ec",
+    "is_read": false,
+    "created_at": "2025-07-22T15:47:42.410Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 2,
+      "minimumQuantity": 3
+    },
+    "createdAt": "2025-07-22T15:47:42.411Z",
+    "updatedAt": "2025-07-22T15:47:42.411Z",
+    "__v": 0
+  },
+  {
+    "_id": "687fb2a0844052ca8143d9bc",
+    "user": "68571f3077111e109ac1d77c",
+    "type": "low_stock",
+    "title": "Item low stock",
+    "message": "Water Bath is now low stock in lab 686bb3fd7a18803c6d50e74b",
+    "is_read": false,
+    "created_at": "2025-07-22T15:47:44.648Z",
+    "priority": "normal",
+    "metadata": {
+      "currentQuantity": 1,
+      "minimumQuantity": 3
+    },
+    "createdAt": "2025-07-22T15:47:44.649Z",
+    "updatedAt": "2025-07-22T15:47:44.649Z",
+    "__v": 0
+  }
+]
