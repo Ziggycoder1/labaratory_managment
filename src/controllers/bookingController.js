@@ -1105,7 +1105,7 @@ const completeBooking = async (req, res) => {
           id: booking._id,
           name: `Booking #${booking.booking_number || booking._id.toString().slice(-6)}`
         },
-created_by: user_id
+        created_by: user_id
       });
 
       await notification.save({ session });

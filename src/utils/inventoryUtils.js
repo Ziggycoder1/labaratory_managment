@@ -106,7 +106,7 @@ async function releaseBookingItems(bookingId, userId, reason = 'booking_complete
             await stockLog.save({ session: localSession });
             
             // Mark this allocation as returned
-            const allocation = {
+            const updatedAllocation = {
               ...booking.allocated_consumables[allocationIndex],
               returned_quantity: allocatedQty,
               returned_at: new Date(),
@@ -114,7 +114,7 @@ async function releaseBookingItems(bookingId, userId, reason = 'booking_complete
             };
             
             // Update the booking's allocated_consumables array
-            booking.allocated_consumables[allocationIndex] = allocation;
+            booking.allocated_consumables[allocationIndex] = updatedAllocation;
             
             console.log(`Successfully released ${allocatedQty} of item ${item.name}`);
           }
