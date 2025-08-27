@@ -1041,18 +1041,29 @@ const completeBooking = async (req, res) => {
   }
   
   const session = await mongoose.startSession();
+  session.startTransaction();
   
   try {
-    await session.withTransaction(async () => {
-      // Find the booking with necessary fields populated
-      const booking = await Booking.findById(id)
-        .populate('user', '_id name email')
-        .populate('lab', 'name')
-        .session(session);
+    console.log('=== STARTING BOOKING COMPLETION ===');
+    console.log('Booking ID:', id);
+    console.log('User ID:', user_id);
+    
+    // Find the booking with necessary fields populated
+    const booking = await Booking.findById(id)
+      .populate('user', '_id name email')
+      .populate('lab', 'name')
+      .session(session);
       
-      if (!booking) {
-        throw new ErrorResponse('Booking not found', 404);
-      }
+    if (!booking) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+      console.log('Transaction started');
+      // Booking already loaded above
       
       // Check if booking is already completed or cancelled
       if (booking.status === 'completed') {
@@ -1077,13 +1088,35 @@ const completeBooking = async (req, res) => {
         }
       }
 
-      // Release any allocated items
+      // Process item requirements
       if (booking.item_requirements && booking.item_requirements.length > 0) {
-        await releaseBookingItems(booking._id, user_id, 'booking_completed_manual', session);
+        console.log('Processing items for booking:', booking._id);
+        const Item = mongoose.model('Item');
         
-        // Save the booking to persist any changes made by releaseBookingItems
-        await booking.save({ session });
-        console.log(`Successfully saved booking after releasing items`);
+        for (const requirement of booking.item_requirements) {
+          if (!requirement.item) continue;
+          
+          const item = await Item.findById(requirement.item).session(session);
+          if (!item) {
+            console.warn(`Item ${requirement.item} not found`);
+            continue;
+          }
+          
+          console.log(`Processing item: ${item.name} (${item._id})`);
+          
+          // For consumable items, return the used quantity
+          if (item.type === 'consumable' && requirement.quantity_needed) {
+            item.available_quantity += requirement.quantity_needed;
+            await item.save({ session });
+            console.log(`Returned ${requirement.quantity_needed} of ${item.name} to inventory`);
+          }
+          // For equipment, mark as available
+          else if (item.type === 'equipment') {
+            item.status = 'available';
+            await item.save({ session });
+            console.log(`Marked ${item.name} as available`);
+          }
+        }
       }
 
       // Update booking status and metadata
@@ -1092,7 +1125,16 @@ const completeBooking = async (req, res) => {
       booking.completed_by = user_id;
       booking.updated_by = user_id;
       
-      await booking.save({ session });
+      // Save the updated booking
+      const updatedBooking = await booking.save({ session });
+      await session.commitTransaction();
+      session.endSession();
+      
+      // Populate the updated booking for the response
+      const populatedBooking = await Booking.findById(updatedBooking._id)
+        .populate('lab', 'name')
+        .populate('user', 'full_name email')
+        .populate('completed_by', 'full_name');
 
       // Create a notification for the booking user
       const notification = new Notification({
@@ -1129,24 +1171,30 @@ const completeBooking = async (req, res) => {
       res.status(200).json({
         success: true,
         message: 'Booking marked as completed successfully',
-        data: {
-          bookingId: booking._id,
-          status: booking.status,
-          completedAt: booking.completed_at
-        }
+        data: populatedBooking
       });
-    });
 
   } catch (error) {
     console.error('=== ERROR COMPLETING BOOKING ===');
+    console.error('Timestamp:', new Date().toISOString());
     console.error('Error:', error);
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
-    console.error('Request params:', req.params);
-    console.error('Request user:', req.user);
-    console.error('Request body:', req.body);
+    console.error('Request params:', JSON.stringify(req.params, null, 2));
+    console.error('Request user:', JSON.stringify(req.user, null, 2));
+    console.error('Request body:', JSON.stringify(req.body, null, 2));
+    console.error('Session ID:', session.id);
+    console.error('Mongoose connection state:', mongoose.connection.readyState);
     console.error('==============================');
+    
+    // Log the full error for debugging
+    if (error.errors) {
+      console.error('Validation Errors:', JSON.stringify(error.errors, null, 2));
+    }
+    if (error.code) {
+      console.error('Error code:', error.code);
+    }
 
     // Handle known error types
     if (error.name === 'ValidationError') {
