@@ -408,45 +408,119 @@ exports.getAlerts = async (req, res) => {
     }
 };
 
-// Search items with filters
+// Search items with filters (matches CatalogueItem fields and applies lab filters)
 exports.searchItems = async (req, res) => {
     try {
-        const { q, name, type, lab_id, low_stock, expiring_soon } = req.query;
+        const { q, name, type, lab_id, low_stock, expiring_soon, page = 1, limit = 10 } = req.query;
 
-        // Build query
-        const query = {};
+        // Normalize search term: support both q and name
+        const queryText = q || name || '';
 
-        if (q) {
-            query.$or = [
-                { name: { $regex: q, $options: 'i' } },
-                { description: { $regex: q, $options: 'i' } },
-                { code: { $regex: q, $options: 'i' } }
-            ];
+        // Base match: restrict to lab, active (not deleted)
+        const matchStage = { };
+        if (lab_id) {
+            matchStage.lab = new mongoose.Types.ObjectId(lab_id);
         }
+        // Exclude soft-deleted
+        matchStage.$or = [
+            { deleted_at: null },
+            { deleted_at: { $exists: false } }
+        ];
 
-        if (name) query.name = { $regex: name, $options: 'i' };
-        if (type) query.type = type;
-        if (lab_id) query.lab = new mongoose.Types.ObjectId(lab_id);
-
+        // Optional stock/expiry filters
         if (low_stock === 'true') {
-            query.$expr = { $lte: ['$available_quantity', '$minimum_quantity'] };
+            matchStage.$expr = { $lte: [ '$available_quantity', '$minimum_quantity' ] };
         }
-
         if (expiring_soon === 'true') {
             const thirtyDaysFromNow = new Date();
             thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-            query.expiry_date = { $lte: thirtyDaysFromNow, $gte: new Date() };
+            matchStage.expiry_date = { $lte: thirtyDaysFromNow, $gte: new Date() };
         }
 
-        const items = await Item.find(query).populate('lab', 'name');
+        // Build aggregation to join CatalogueItem, then filter on its fields
+        const pipeline = [
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'catalogueitems',
+                    localField: 'catalogue_item_id',
+                    foreignField: '_id',
+                    as: 'catalogue'
+                }
+            },
+            { $unwind: '$catalogue' }
+        ];
 
-        res.json({
+        // Type filter is on catalogue.type
+        if (type) {
+            pipeline.push({ $match: { 'catalogue.type': type } });
+        }
+
+        // Text/regex search on catalogue fields (partial, case-insensitive)
+        if (queryText) {
+            const regex = new RegExp(queryText, 'i');
+            pipeline.push({
+                $match: {
+                    $or: [
+                        { 'catalogue.name': { $regex: regex } },
+                        { 'catalogue.description': { $regex: regex } },
+                        { 'catalogue.code': { $regex: regex } }
+                    ]
+                }
+            });
+        }
+
+        // Total count for pagination
+        pipeline.push(
+            {
+                $facet: {
+                    data: [
+                        { $sort: { updatedAt: -1 } },
+                        { $skip: (parseInt(page) - 1) * parseInt(limit) },
+                        { $limit: parseInt(limit) },
+                        {
+                            $project: {
+                                _id: 1,
+                                lab: 1,
+                                storage_type: 1,
+                                quantity: 1,
+                                available_quantity: 1,
+                                minimum_quantity: 1,
+                                expiry_date: 1,
+                                status: 1,
+                                created_by: 1,
+                                catalogue_item_id: '$catalogue._id',
+                                // Flatten catalogue fields expected by frontend
+                                name: '$catalogue.name',
+                                type: '$catalogue.type',
+                                unit: '$catalogue.unit',
+                                description: '$catalogue.description',
+                                code: '$catalogue.code'
+                            }
+                        }
+                    ],
+                    totalCount: [ { $count: 'count' } ]
+                }
+            }
+        );
+
+        const result = await Item.aggregate(pipeline);
+        const data = result[0]?.data || [];
+        const total = result[0]?.totalCount?.[0]?.count || 0;
+
+        return res.json({
             success: true,
-            data: items
+            data,
+            pagination: {
+                current_page: parseInt(page),
+                per_page: parseInt(limit),
+                total_count: total,
+                total_pages: Math.max(1, Math.ceil(total / parseInt(limit)))
+            }
         });
     } catch (error) {
         console.error('Error searching items:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: 'Error searching items',
             error: error.message

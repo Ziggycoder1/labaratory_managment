@@ -66,7 +66,13 @@ const getAllStockLogs = async (req, res) => {
     
     // Build populate options
     const populateOptions = populate.split(',').map(field => {
-      if (field === 'item') return { path: 'item', select: 'name type' };
+      if (field === 'item') {
+        return { 
+          path: 'item', 
+          select: 'quantity available_quantity status lab catalogue_item_id',
+          populate: { path: 'catalogue_item_id', select: 'name type unit code category description' }
+        };
+      }
       if (field === 'user') return { path: 'user', select: 'full_name email' };
       if (field === 'lab') return { path: 'lab', select: 'name' };
       return field;
@@ -90,14 +96,36 @@ const getAllStockLogs = async (req, res) => {
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit))
-      .lean();
+      .lean({ virtuals: true });
 
     console.log(`Found ${stockLogs.length} stock logs`);
 
-    // Return data in the format expected by the frontend
+    // Map combined item fields and alias change_quantity -> quantity for frontend
+    const mappedLogs = stockLogs.map(l => {
+      const item = l.item || {};
+      const cat = item.catalogue_item_id || {};
+      const combinedItem = {
+        _id: item._id,
+        lab: item.lab,
+        status: item.status,
+        quantity: item.quantity,
+        available_quantity: item.available_quantity,
+        name: item.name || cat.name,
+        type: item.type || cat.type,
+        unit: item.unit || cat.unit,
+        code: item.code || cat.code,
+        category: item.category || cat.category
+      };
+      return {
+        ...l,
+        item: combinedItem,
+        quantity: l.change_quantity
+      };
+    });
+
     const response = {
       success: true,
-      data: stockLogs,
+      data: mappedLogs,
       pagination: {
         current_page: parseInt(page),
         total_pages: Math.ceil(totalCount / limit),
@@ -121,21 +149,44 @@ const getAllStockLogs = async (req, res) => {
 // Get specific stock log
 const getStockLogById = async (req, res) => {
   try {
-    const stockLog = await StockLog.findById(req.params.id)
-      .populate('item', 'name type')
+    const stockLogDoc = await StockLog.findById(req.params.id)
+      .populate({
+        path: 'item',
+        select: 'quantity available_quantity status lab catalogue_item_id',
+        populate: { path: 'catalogue_item_id', select: 'name type unit code category description' }
+      })
       .populate('user', 'full_name email')
-      .lean();
+      .lean({ virtuals: true });
 
-    if (!stockLog) {
+    if (!stockLogDoc) {
       return res.status(404).json({
         success: false,
         message: 'Stock log not found'
       });
     }
 
+    const item = stockLogDoc.item || {};
+    const cat = item.catalogue_item_id || {};
+    const combinedItem = {
+      _id: item._id,
+      lab: item.lab,
+      status: item.status,
+      quantity: item.quantity,
+      available_quantity: item.available_quantity,
+      name: item.name || cat.name,
+      type: item.type || cat.type,
+      unit: item.unit || cat.unit,
+      code: item.code || cat.code,
+      category: item.category || cat.category
+    };
+
     res.json({
       success: true,
-      data: stockLog
+      data: {
+        ...stockLogDoc,
+        item: combinedItem,
+        quantity: stockLogDoc.change_quantity
+      }
     });
   } catch (error) {
     console.error('Get stock log error:', error);
@@ -202,15 +253,35 @@ const createStockLog = async (req, res) => {
       reason
     });
 
-    const populatedStockLog = await StockLog.findById(stockLog._id)
-      .populate('item', 'name type')
-      .populate('user', 'full_name email');
+    const populatedStockLogDoc = await StockLog.findById(stockLog._id)
+      .populate({
+        path: 'item',
+        select: 'quantity available_quantity status lab catalogue_item_id',
+        populate: { path: 'catalogue_item_id', select: 'name type unit code category description' }
+      })
+      .populate('user', 'full_name email')
+      .lean({ virtuals: true });
+
+    const i = populatedStockLogDoc.item || {};
+    const c = i.catalogue_item_id || {};
+    const combined = {
+      _id: i._id,
+      lab: i.lab,
+      status: i.status,
+      quantity: i.quantity,
+      available_quantity: i.available_quantity,
+      name: i.name || c.name,
+      type: i.type || c.type,
+      unit: i.unit || c.unit,
+      code: i.code || c.code,
+      category: i.category || c.category
+    };
 
     res.status(201).json({
       success: true,
       message: 'Stock updated successfully',
       data: {
-        stockLog: populatedStockLog,
+        stockLog: { ...populatedStockLogDoc, item: combined, quantity: populatedStockLogDoc.change_quantity },
         newQuantity: item.quantity,
         newAvailableQuantity: item.available_quantity
       }
@@ -234,12 +305,38 @@ const getStockLogsByItem = async (req, res) => {
     const skip = (page - 1) * limit;
     const totalCount = await StockLog.countDocuments({ item: item_id });
     
-    const stockLogs = await StockLog.find({ item: item_id })
+    const stockLogsDocs = await StockLog.find({ item: item_id })
+      .populate({
+        path: 'item',
+        select: 'quantity available_quantity status lab catalogue_item_id',
+        populate: { path: 'catalogue_item_id', select: 'name type unit code category description' }
+      })
       .populate('user', 'full_name email')
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .lean();
+      .lean({ virtuals: true });
+
+    const stockLogs = stockLogsDocs.map(l => {
+      const item = l.item || {};
+      const cat = item.catalogue_item_id || {};
+      return {
+        ...l,
+        item: {
+          _id: item._id,
+          lab: item.lab,
+          status: item.status,
+          quantity: item.quantity,
+          available_quantity: item.available_quantity,
+          name: item.name || cat.name,
+          type: item.type || cat.type,
+          unit: item.unit || cat.unit,
+          code: item.code || cat.code,
+          category: item.category || cat.category
+        },
+        quantity: l.change_quantity
+      };
+    });
 
     res.json({
       success: true,
@@ -272,12 +369,37 @@ const getStockLogsByUser = async (req, res) => {
     const skip = (page - 1) * limit;
     const totalCount = await StockLog.countDocuments({ user: user_id });
     
-    const stockLogs = await StockLog.find({ user: user_id })
-      .populate('item', 'name type')
+    const stockLogsDocs = await StockLog.find({ user: user_id })
+      .populate({
+        path: 'item',
+        select: 'quantity available_quantity status lab catalogue_item_id',
+        populate: { path: 'catalogue_item_id', select: 'name type unit code category description' }
+      })
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .lean();
+      .lean({ virtuals: true });
+
+    const stockLogs = stockLogsDocs.map(l => {
+      const item = l.item || {};
+      const cat = item.catalogue_item_id || {};
+      return {
+        ...l,
+        item: {
+          _id: item._id,
+          lab: item.lab,
+          status: item.status,
+          quantity: item.quantity,
+          available_quantity: item.available_quantity,
+          name: item.name || cat.name,
+          type: item.type || cat.type,
+          unit: item.unit || cat.unit,
+          code: item.code || cat.code,
+          category: item.category || cat.category
+        },
+        quantity: l.change_quantity
+      };
+    });
 
     res.json({
       success: true,

@@ -7,11 +7,11 @@ const router = express.Router();
 // Validation middleware
 const validateBooking = [
   body('lab_id').isMongoId().withMessage('Lab ID must be a valid MongoDB ID'),
-  body('field_id').isMongoId().withMessage('Field ID must be a valid MongoDB ID'),
+  body('field_id').optional({ values: 'falsy' }).isMongoId().withMessage('Field ID must be a valid MongoDB ID'),
   body('start_time').isISO8601().withMessage('Start time must be a valid date'),
   body('end_time').isISO8601().withMessage('End time must be a valid date'),
   body('purpose').isString().notEmpty().withMessage('Purpose is required'),
-  body('booking_type').optional().isIn(['research', 'teaching', 'practical', 'maintenance', 'other']).withMessage('Invalid booking type'),
+  body('booking_type').optional().isIn(['lecture', 'practical', 'exam', 'research', 'meeting', 'maintenance', 'other']).withMessage('Invalid booking type'),
   body('participants_count').optional().isInt({ min: 1 }).withMessage('Participants count must be at least 1'),
   body('equipment_needed').optional().isString().withMessage('Equipment needed must be a string'),
   body('special_instructions').optional().isString().withMessage('Special instructions must be a string'),

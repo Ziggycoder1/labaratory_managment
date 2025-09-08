@@ -20,6 +20,17 @@ const {
 } = require('../utils/inventoryUtils');
 const moment = require('moment-timezone');
 
+// Helper to normalize various legacy/alias item types to the Booking schema enum
+const normalizeItemType = (t) => {
+  const s = (t || '').toString().trim().toLowerCase();
+  if (!s) return s;
+  // Map legacy/alias values
+  if (['fixed', 'equipment', 'asset', 'fixedasset', 'fixed_asset'].includes(s)) return 'fixed_asset';
+  if (['non-consumable', 'non_consumable', 'reusable'].includes(s)) return 'non_consumable';
+  if (['consumable', 'consumables'].includes(s)) return 'consumable';
+  return s; // assume already one of the allowed values
+};
+
 // Get all bookings with filters and role-based access
 const getAllBookings = async (req, res) => {
   try {
@@ -99,20 +110,29 @@ const getAllBookings = async (req, res) => {
       .populate('field', 'name')
       .populate('user', 'full_name role')
       .populate('approved_by', 'full_name')
-      .populate('item_requirements.item', 'name')
-      .sort({ start_time: -1 })
+      .populate({
+        path: 'item_requirements.item',
+        select: 'available_quantity status lab catalogue_item_id',
+        populate: {
+          path: 'catalogue_item_id',
+          select: 'name type unit description code'
+        }
+      })
+      // Sort latest created first
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
     const mappedBookings = bookings.map(b => ({
       id: b._id,
+      title: b.title,
       lab_id: b.lab?._id,
       lab_name: b.lab?.name,
       field_id: b.field?._id,
       field_name: b.field?.name,
       user_id: b.user?._id,
-      user_name: b.user?.full_name,
+      user_name: b.user_name || b.user?.full_name,
       user_role: b.user?.role,
       start_time: b.start_time ? new Date(b.start_time).toISOString() : null,
       end_time: b.end_time ? new Date(b.end_time).toISOString() : null,
@@ -120,7 +140,7 @@ const getAllBookings = async (req, res) => {
       status: b.status,
       requested_consumables: (b.item_requirements || []).map(req => ({
         item_id: req.item?._id,
-        item_name: req.item?.name,
+        item_name: req.item?.catalogue_item_id?.name || req.item?.name || req.name || 'Unnamed Item',
         quantity: req.quantity_needed
       })),
       created_at: b.createdAt ? new Date(b.createdAt).toISOString() : null,
@@ -159,7 +179,11 @@ const getBookingById = async (req, res) => {
       .populate('field', 'name code description')
       .populate('user', 'full_name email department phone')
       .populate('approved_by', 'full_name email')
-      .populate('item_requirements.item', 'name type available_quantity description')
+      .populate({
+        path: 'item_requirements.item',
+        select: 'available_quantity status lab catalogue_item_id',
+        populate: { path: 'catalogue_item_id', select: 'name type unit description code' }
+      })
       .lean();
 
     if (!booking) {
@@ -218,7 +242,7 @@ const createBooking = async (req, res) => {
       lab_id, field_id, start_time, end_time, purpose, booking_type,
       participants_count, equipment_needed, item_requirements, 
       special_instructions, setup_time_needed, cleanup_time_needed,
-      is_recurring, recurring_pattern, title, created_by, user
+      is_recurring, recurring_pattern, title, created_by, user, user_name
     } = req.body;
     
     // Log the extracted fields
@@ -282,7 +306,9 @@ const createBooking = async (req, res) => {
       item_requirements: [],
       status: 'pending',
       is_recurring: is_recurring || false,
-      recurring_pattern: recurring_pattern || null
+      recurring_pattern: recurring_pattern || null,
+      // persist free-text booked by name when provided
+      ...(user_name && typeof user_name === 'string' ? { user_name: user_name.trim() } : {})
     };
     
     // Log the constructed booking data for debugging
@@ -298,7 +324,7 @@ const createBooking = async (req, res) => {
         notes: req.notes || ''
       }));
 
-      // Validate each requirement
+      // Validate each requirement and denormalize name/type
       for (const requirement of normalizedRequirements) {
         if (!requirement.item) {
           return res.status(400).json({
@@ -356,6 +382,10 @@ const createBooking = async (req, res) => {
             }
           });
         }
+
+        // Denormalize catalogue name/type into the requirement for easy display
+        requirement.name = item.name || (item.catalogue_item_id && item.catalogue_item_id.name) || requirement.name;
+        requirement.type = normalizeItemType(item.type || (item.catalogue_item_id && item.catalogue_item_id.type) || requirement.type);
       }
 
       // Update item requirements with normalized data
@@ -424,7 +454,14 @@ const createBooking = async (req, res) => {
         .populate('lab', 'name code')
         .populate('field', 'name code')
         .populate('user', 'full_name email')
-        .populate('item_requirements.item', 'name type');
+        .populate({
+          path: 'item_requirements.item',
+          select: 'available_quantity status lab catalogue_item_id',
+          populate: {
+            path: 'catalogue_item_id',
+            select: 'name type unit description code'
+          }
+        });
 
       // Send admin notification for the booking
       try {
@@ -681,8 +718,8 @@ const approveBooking = async (req, res) => {
             throw error;
           }
         }
-        // For non-consumable items, ensure they're available and not in maintenance
-        else if (item.type === 'equipment') {
+        // For non-consumable/fixed asset items, ensure they're available and not in maintenance
+        else if (['fixed_asset', 'non_consumable'].includes(normalizeItemType(item.type))) {
           if (item.status === 'in_maintenance') {
             await session.abortTransaction();
             session.endSession();

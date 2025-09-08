@@ -101,6 +101,12 @@ const bookingSchema = new Schema({
     ref: 'User', 
     required: [true, 'User is required'] 
   },
+  // Free-text name of the person who made the booking (from UI)
+  user_name: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Booked by name cannot exceed 200 characters']
+  },
   title: {
     type: String,
     required: [true, 'Title is required'],

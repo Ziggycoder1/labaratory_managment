@@ -86,6 +86,15 @@ itemSchema.virtual('description').get(function() {
   return this.catalogue_item_id?.description;
 });
 
+// Additional virtuals to expose catalogue fields commonly used by the frontend
+itemSchema.virtual('code').get(function() {
+  return this.catalogue_item_id?.code;
+});
+
+itemSchema.virtual('category').get(function() {
+  return this.catalogue_item_id?.category;
+});
+
 // Add method to get full item data with catalogue fields
 itemSchema.methods.getFullData = async function() {
   await this.populate('catalogue_item_id');
